@@ -5,7 +5,7 @@ spring:
   application:
     name: finanzas
   datasource:
-    url: ${DATASOURCE_URL}
+    url: jdbc:${DATASOURCE_URL}
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${DATASOURCE_USERNAME}
     password: ${DATASOURCE_PASSWORD}
