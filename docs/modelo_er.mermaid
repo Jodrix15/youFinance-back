@@ -1,0 +1,103 @@
+%% Modelo Entidad-Relación - App de Finanzas Personales
+%% Todas las entidades de datos cuelgan de USUARIO (multi-usuario)
+
+erDiagram
+    USUARIO ||--o{ CATEGORIA        : "crea"
+    USUARIO ||--o{ TRANSACCION      : "registra"
+    USUARIO ||--o{ RECURRENTE       : "tiene"
+    USUARIO ||--o{ SUSCRIPCION      : "tiene"
+    USUARIO ||--o{ DEUDA            : "tiene"
+    USUARIO ||--o{ INVERSION        : "tiene"
+    USUARIO ||--o{ PATRIMONIO_SNAPSHOT : "acumula"
+
+    CATEGORIA ||--o{ TRANSACCION    : "clasifica"
+    CATEGORIA ||--o{ RECURRENTE     : "clasifica"
+    CATEGORIA ||--o{ SUSCRIPCION    : "clasifica"
+
+    SUSCRIPCION ||--o{ SUSCRIPCION_PRECIO : "historial"
+
+    USUARIO {
+        bigint   id PK
+        varchar  email
+        varchar  password
+        varchar  nombre
+        enum     role "USER / ADMIN"
+    }
+
+    CATEGORIA {
+        bigint   id PK
+        bigint   usuario_id FK
+        varchar  nombre
+        varchar  color "hex, ej #378ADD"
+        enum     tipo "GASTO / INGRESO / MIXTO"
+    }
+
+    TRANSACCION {
+        bigint   id PK
+        bigint   usuario_id FK
+        bigint   categoria_id FK
+        enum     tipo "GASTO / INGRESO"
+        varchar  descripcion
+        decimal  importe
+        date     fecha
+    }
+
+    RECURRENTE {
+        bigint   id PK
+        bigint   usuario_id FK
+        bigint   categoria_id FK
+        varchar  nombre
+        decimal  importe
+        enum     frecuencia "MENSUAL / ANUAL"
+        date     proxima_fecha
+        varchar  notas
+    }
+
+    SUSCRIPCION {
+        bigint   id PK
+        bigint   usuario_id FK
+        bigint   categoria_id FK
+        varchar  nombre
+        varchar  color "hex"
+        boolean  activa
+    }
+
+    SUSCRIPCION_PRECIO {
+        bigint   id PK
+        bigint   suscripcion_id FK
+        date     fecha "inicio de vigencia"
+        decimal  precio
+    }
+
+    DEUDA {
+        bigint   id PK
+        bigint   usuario_id FK
+        varchar  nombre
+        varchar  tipo "Hipoteca / Prestamo / Tarjeta / Personal"
+        decimal  importe_pendiente
+        decimal  importe_original
+        decimal  cuota
+        decimal  interes "porcentaje"
+        varchar  notas
+    }
+
+    INVERSION {
+        bigint   id PK
+        bigint   usuario_id FK
+        varchar  nombre
+        varchar  tipo "Fondo / Accion / Cripto / Deposito"
+        decimal  importe_invertido
+        decimal  valor_actual
+        date     fecha_alta
+    }
+
+    PATRIMONIO_SNAPSHOT {
+        bigint   id PK
+        bigint   usuario_id FK
+        int      anio
+        int      mes
+        decimal  inversion
+        decimal  ahorro
+        decimal  deuda
+        decimal  gasto
+    }
