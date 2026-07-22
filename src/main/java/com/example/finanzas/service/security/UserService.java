@@ -19,4 +19,10 @@ public interface UserService extends UserDetailsService {
     void changePassword(String username, ChangePasswordRequest request);
 
     UserProfileResponse updatePreferences(String username, UpdatePreferencesRequest request);
+
+    /** Config del dashboard como JSON en texto plano (o null si no hay). */
+    String getDashboardConfig(String username);
+
+    /** Guarda el JSON del dashboard tal cual y devuelve lo guardado. */
+    String updateDashboardConfig(String username, String config);
 }

@@ -6,6 +6,7 @@ import com.example.finanzas.dto.user.UpdateProfileRequest;
 import com.example.finanzas.dto.user.UserProfileResponse;
 import com.example.finanzas.service.security.UserService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,5 +45,20 @@ public class UserController {
             @AuthenticationPrincipal UserDetails principal,
             @Valid @RequestBody UpdatePreferencesRequest request) {
         return ResponseEntity.ok(userService.updatePreferences(principal.getUsername(), request));
+    }
+
+    /** Config personal del dashboard (disposición/visibilidad de widgets), como JSON en texto. */
+    @GetMapping(value = "/me/dashboard", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> getDashboard(@AuthenticationPrincipal UserDetails principal) {
+        return ResponseEntity.ok(userService.getDashboardConfig(principal.getUsername()));
+    }
+
+    @PutMapping(value = "/me/dashboard",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> updateDashboard(
+            @AuthenticationPrincipal UserDetails principal,
+            @RequestBody String config) {
+        return ResponseEntity.ok(userService.updateDashboardConfig(principal.getUsername(), config));
     }
 }
