@@ -17,6 +17,8 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
 
     boolean existsByCategoriaId(Long categoriaId);
 
+    boolean existsByCuentaId(Long cuentaId);
+
     /** Todas las transacciones del usuario en una sola consulta (evita el N+1). */
     @Query("select t from TransaccionEntity t " +
             "join fetch t.cuenta left join fetch t.categoria " +

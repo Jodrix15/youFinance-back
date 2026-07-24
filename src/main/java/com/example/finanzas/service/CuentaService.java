@@ -24,6 +24,8 @@ public interface CuentaService {
 
     CuentaEntity updateCuenta(Long id, CuentaDTO cuentaDTO, UserEntity user);
 
+    void deleteCuenta(Long id, UserEntity user);
+
     List<TransaccionEntity> getAllTransacciones(Long cuentaId, UserEntity user);
 
     TransaccionEntity getTransaccion(Long cuentaId, Long transaccionId, UserEntity user);
