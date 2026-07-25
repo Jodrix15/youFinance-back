@@ -37,6 +37,7 @@ public class SecurityConfig {
     private final AuthCookies authCookies;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+    private final RestAccessDeniedHandler accessDeniedHandler;
 
     // Orígenes permitidos para CORS. Configurable por env var CORS_ALLOWED_ORIGINS
     // (lista separada por comas). Por defecto: el front de Vercel y el dev local.
@@ -51,6 +52,12 @@ public class SecurityConfig {
         // directa del token) porque es el que encaja con un SPA que lee la cookie y
         // reenvía su valor tal cual. /api/auth/** se excluye (aún no hay sesión).
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
+        // Carga anticipada del token en CADA petición (en vez del comportamiento
+        // diferido por defecto de Spring Security 6). Así el CookieCsrfTokenRepository
+        // siempre escribe la cookie XSRF-TOKEN y el SPA la tiene disponible para
+        // reenviarla; sin esto, la cookie a veces no se materializa y las escrituras
+        // fallan con "no token was found to compare" (MissingCsrfTokenException).
+        csrfHandler.setCsrfRequestAttributeName(null);
 
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -59,6 +66,8 @@ public class SecurityConfig {
                 .csrfTokenRequestHandler(csrfHandler)
                 .ignoringRequestMatchers("/api/auth/**", "/h2-console/**")
             )
+            // 403 con el motivo real (CSRF vs. permiso) en JSON, no un genérico.
+            .exceptionHandling(ex -> ex.accessDeniedHandler(accessDeniedHandler))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/h2-console/**", "/error").permitAll()
                 // Todos los recursos van filtrados por el usuario del token

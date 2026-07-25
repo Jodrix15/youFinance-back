@@ -113,8 +113,21 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public String getDashboardConfig(String username) {
-        String raw = findUser(username).getDashboardConfig();
-        return StringUtils.hasText(raw) ? raw : null;
+        UserEntity user = findUser(username);
+        String raw = user.getDashboardConfig();
+        if (StringUtils.hasText(raw)) {
+            return raw;
+        }
+        // Usuario sin config propia (p. ej. recién registrado): hereda la
+        // disposición del admin como plantilla, si existe. No se persiste: en
+        // cuanto el usuario reordene su dashboard se guardará la suya propia.
+        if (user.getRole() != RoleEnum.ROLE_ADMIN) {
+            return userRepository.findFirstByRole(RoleEnum.ROLE_ADMIN)
+                    .map(UserEntity::getDashboardConfig)
+                    .filter(StringUtils::hasText)
+                    .orElse(null);
+        }
+        return null;
     }
 
     @Override
