@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
@@ -70,10 +71,12 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex.accessDeniedHandler(accessDeniedHandler))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/h2-console/**", "/error").permitAll()
-                // Todos los recursos van filtrados por el usuario del token
+                // Gestión de feedback: listar y cambiar estado es exclusivo de admin.
+                // (Enviar feedback —POST /api/feedback— queda para cualquier autenticado.)
+                .requestMatchers(HttpMethod.GET, "/api/feedback").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/feedback/**").hasRole("ADMIN")
+                // El resto de recursos van filtrados por el usuario del token
                 // (@AuthenticationPrincipal), así que basta con estar autenticado.
-                // No hay endpoints exclusivos de ADMIN: un usuario registrado
-                // (ROLE_USER) puede usar la aplicación con normalidad.
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
