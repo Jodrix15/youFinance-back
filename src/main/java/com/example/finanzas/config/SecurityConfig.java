@@ -65,12 +65,12 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository())
                 .csrfTokenRequestHandler(csrfHandler)
-                .ignoringRequestMatchers("/api/auth/**", "/h2-console/**")
+                .ignoringRequestMatchers("/api/auth/**")
             )
             // 403 con el motivo real (CSRF vs. permiso) en JSON, no un genérico.
             .exceptionHandling(ex -> ex.accessDeniedHandler(accessDeniedHandler))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/h2-console/**", "/error").permitAll()
+                .requestMatchers("/api/auth/**", "/error").permitAll()
                 // Gestión de feedback: listar y cambiar estado es exclusivo de admin.
                 // (Enviar feedback —POST /api/feedback— queda para cualquier autenticado.)
                 .requestMatchers(HttpMethod.GET, "/api/feedback").hasRole("ADMIN")
@@ -82,7 +82,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-            .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
+            // Anti-clickjacking: solo se permite enmarcar la app desde el mismo origen.
+            .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
             .authenticationProvider(authenticationProvider())
             // Rate limiting del login antes de procesar credenciales.
             .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
