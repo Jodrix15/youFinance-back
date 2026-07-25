@@ -59,6 +59,13 @@ public class CuentaController {
         return ResponseEntity.ok(CuentaResponse.from(service.updateCuenta(id, cuentaDTO, user)));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCuenta(@PathVariable Long id,
+                                             @AuthenticationPrincipal UserEntity user) {
+        service.deleteCuenta(id, user);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/transacciones")
     public ResponseEntity<List<TransaccionResponse>> getAllTransacciones(@PathVariable Long id,
                                                                           @AuthenticationPrincipal UserEntity user) {

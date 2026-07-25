@@ -427,4 +427,56 @@ jwt:
   expiration: 86400000          # Expiración del token: 24 horas en milisegundos
 ```
 
+---
+
+## Autenticación por cookie httpOnly (actualización)
+
+El JWT ya **no viaja en el cuerpo ni se guarda en `localStorage`**. Ahora se
+transporta en una **cookie httpOnly**, que el JavaScript del navegador no puede
+leer: esto protege el token frente al robo por XSS.
+
+Flujo:
+
+- `POST /api/auth/login` y `/register` fijan la cookie (`Set-Cookie`, httpOnly).
+- `POST /api/auth/logout` la borra (el JS no puede borrar una cookie httpOnly).
+- `JwtAuthenticationFilter` lee el token de la cookie (con respaldo por cabecera
+  `Authorization: Bearer` para pruebas/clientes no navegador).
+- El front usa `withCredentials: true`; ya no maneja el token.
+
+### CSRF
+
+Como la cookie se envía automáticamente, se reactiva la protección CSRF con el
+patrón *double-submit*: `CookieCsrfTokenRepository` publica una cookie
+`XSRF-TOKEN` (legible por JS) y el front la reenvía en la cabecera
+`X-XSRF-TOKEN`. Los endpoints `/api/auth/**` se excluyen (aún no hay sesión).
+
+### Rate limiting del login
+
+`LoginRateLimitFilter` limita los intentos de `POST /api/auth/login` por IP
+(ventana fija en memoria) y responde `429` al superar el límite. Configurable con
+`auth.login.max-attempts` y `auth.login.window-seconds`. **Limitación:** el
+contador es por instancia; con varias réplicas conviene Redis o un gateway/WAF.
+
+### Configuración por entorno
+
+```yaml
+auth:
+  cookie:
+    name: ACCESS_TOKEN
+    secure: true          # producción: SIEMPRE true (solo HTTPS)
+    same-site: None       # cross-site (front y back en dominios distintos)
+  login:
+    max-attempts: 10
+    window-seconds: 300
+cors:
+  allowed-origins: https://tu-front.example
+```
+
+**Despliegue — importante:** con el front en Vercel y el back en otro dominio
+(cross-site), la cookie necesita `SameSite=None; Secure`, y los navegadores
+tienden a bloquear cookies de terceros. Lo más robusto es **servir front y back
+en el mismo sitio** (mismo dominio/subdominio o un proxy que deje la API como
+*same-origin*) y usar `SameSite=Lax`. En desarrollo, el proxy de Vite ya deja
+todo en el mismo origen, así que `Lax` funciona sin ajustes.
+
 > **`ddl-auto: create-drop`** elimina y recrea todas las tablas cada vez que arranca la app. Útil en desarrollo, **peligroso en producción**. Para producción usar `validate` o `none`.
