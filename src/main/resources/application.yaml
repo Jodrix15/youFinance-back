@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: finanzas
+  datasource:
+    url: jdbc:mysql://localhost:3306/finanzas
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: "root"
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.MySQLDialect
+
+jwt:
+  secret: ZmluYW56YXMtc2VjcmV0LWtleS1hdC1sZWFzdC0yNTYtYml0cy1sb25nLWZvci1qd3Q=
+  expiration: 86400000

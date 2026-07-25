@@ -1,5 +1,7 @@
 package com.example.finanzas.service.impl;
 
+import com.example.finanzas.dto.dashboard.DistribucionPatrimonioResponse;
+import com.example.finanzas.dto.inversion.DistribucionCategoriaResponse;
 import com.example.finanzas.model.PatrimonioSnapshotEntity;
 import com.example.finanzas.model.UserEntity;
 import com.example.finanzas.repository.PatrimonioSnapshotRepository;
@@ -12,8 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -30,6 +34,38 @@ public class DashboardServiceImpl implements DashboardService {
         return cuentaService.getImporteTotal(user)
                 .add(inversionService.getImporteTotal(user))
                 .subtract(deudaService.getImporteTotal(user));
+    }
+
+    @Override
+    public List<DistribucionPatrimonioResponse> getDistribucionPatrimonio(UserEntity user) {
+        BigDecimal totalCuentas = cuentaService.getImporteTotal(user);
+        List<DistribucionCategoriaResponse> inversiones = inversionService.getDistribucionPorCategoria(user);
+
+        BigDecimal totalInversiones = inversiones.stream()
+                .map(DistribucionCategoriaResponse::capitalTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Total de referencia para los porcentajes: todo el patrimonio menos las deudas.
+        BigDecimal total = totalCuentas.add(totalInversiones);
+
+        List<DistribucionPatrimonioResponse> distribucion = new ArrayList<>();
+        if (totalCuentas.signum() > 0) {
+            distribucion.add(new DistribucionPatrimonioResponse(
+                    "Cuentas", totalCuentas, porcentaje(totalCuentas, total)));
+        }
+        for (DistribucionCategoriaResponse inversion : inversiones) {
+            distribucion.add(new DistribucionPatrimonioResponse(
+                    inversion.categoriaNombre(),
+                    inversion.capitalTotal(),
+                    porcentaje(inversion.capitalTotal(), total)));
+        }
+        return distribucion;
+    }
+
+    private BigDecimal porcentaje(BigDecimal parte, BigDecimal total) {
+        if (total.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        return parte.divide(total, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
     }
 
     @Override

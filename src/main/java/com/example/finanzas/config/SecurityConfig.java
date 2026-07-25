@@ -45,10 +45,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // El JWT viaja ahora en una cookie httpOnly, que el navegador envía sola:
-        // eso reintroduce el riesgo de CSRF, así que lo protegemos con el patrón
-        // double-submit (cookie XSRF-TOKEN legible por JS + cabecera X-XSRF-TOKEN).
-        // Los endpoints de /api/auth/** se excluyen porque aún no hay sesión.
+        // El JWT viaja en una cookie httpOnly (a salvo de XSS). Como el navegador la
+        // envía sola, protegemos con CSRF double-submit: cookie XSRF-TOKEN legible
+        // por JS + cabecera X-XSRF-TOKEN. Usamos el handler "raw" (comparación
+        // directa del token) porque es el que encaja con un SPA que lee la cookie y
+        // reenvía su valor tal cual. /api/auth/** se excluye (aún no hay sesión).
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
 
         http
@@ -74,7 +75,7 @@ public class SecurityConfig {
             // Rate limiting del login antes de procesar credenciales.
             .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            // Vuelca la cookie XSRF-TOKEN una vez resuelto el token CSRF.
+            // Materializa el token CSRF y vuelca la cookie XSRF-TOKEN en cada respuesta.
             .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
         return http.build();
     }
@@ -99,7 +100,11 @@ public class SecurityConfig {
         return registration;
     }
 
-    /** Repositorio CSRF basado en cookie (legible por JS), con SameSite/Secure coherentes con la cookie de auth. */
+    /**
+     * Repositorio CSRF basado en cookie legible por JS (XSRF-TOKEN), con
+     * SameSite/Secure coherentes con la cookie de autenticación. Guarda el token
+     * "en crudo", que es lo que el SPA lee y reenvía en la cabecera.
+     */
     @Bean
     public CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();

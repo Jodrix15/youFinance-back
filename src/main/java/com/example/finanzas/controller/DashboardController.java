@@ -1,7 +1,7 @@
 package com.example.finanzas.controller;
 
+import com.example.finanzas.dto.dashboard.DistribucionPatrimonioResponse;
 import com.example.finanzas.dto.dashboard.PatrimonioSnapshotResponse;
-import com.example.finanzas.dto.inversion.DistribucionCategoriaResponse;
 import com.example.finanzas.model.UserEntity;
 import com.example.finanzas.service.CuentaService;
 import com.example.finanzas.service.DashboardService;
@@ -61,10 +61,10 @@ public class DashboardController {
         return ResponseEntity.ok(deudaService.getImporteTotal(user));
     }
 
-    /*@GetMapping("/distribucion-patrimonio")
-    public ResponseEntity<BigDecimal> getDistribucionCapital(@AuthenticationPrincipal UserEntity user) {
-        //todo
-    }*/
+    @GetMapping("/distribucion-patrimonio")
+    public ResponseEntity<List<DistribucionPatrimonioResponse>> getDistribucionPatrimonio(@AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(dashboardService.getDistribucionPatrimonio(user));
+    }
 
 
 
