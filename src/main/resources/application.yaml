@@ -1,17 +1,24 @@
-server:
-  port: ${PORT:8080}
-
 spring:
   application:
     name: finanzas
+  # Migraciones de esquema con Flyway. baseline-on-migrate marca las BDs que ya
+  # tienen tablas (creadas antes por Hibernate) como "en V1" sin ejecutar el V1
+  # ni tocar datos; los V2+ se aplican normalmente. En una BD vacía, ejecuta el
+  # V1 para crear el esquema desde cero.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: "baseline esquema inicial"
   datasource:
-    url: jdbc:${DATASOURCE_URL}
+    url: jdbc:mysql://localhost:3306/finanzas
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: root
+    password: "root"
   jpa:
     hibernate:
-      ddl-auto: update
+      # Flyway gestiona el esquema; Hibernate solo valida que coincide.
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -19,5 +26,5 @@ spring:
     database-platform: org.hibernate.dialect.MySQLDialect
 
 jwt:
-  secret: ${JWT_TOKEN}
-  expiration: ${EXPIRATION_TOKEN}
+  secret: ZmluYW56YXMtc2VjcmV0LWtleS1hdC1sZWFzdC0yNTYtYml0cy1sb25nLWZvci1qd3Q=
+  expiration: 86400000
