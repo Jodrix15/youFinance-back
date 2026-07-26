@@ -1,2 +1,8 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+
+# application.yaml: cada rama (main / develop / local) tiene el suyo. Al mergear,
+# git mantiene SIEMPRE la versión de la rama destino e ignora la que entra.
+# Requiere definir el driver 'ours' en la config LOCAL de git, una vez por clon:
+#   git config merge.ours.driver true
+src/main/resources/application.yaml merge=ours
