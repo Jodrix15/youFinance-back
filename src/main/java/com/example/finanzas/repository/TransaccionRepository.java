@@ -72,4 +72,45 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
             "group by t.categoria.nombreCategoria " +
             "order by sum(abs(t.importe)) desc")
     List<Object[]> gastosPorCategoria(@Param("userId") UUID userId);
+
+    /**
+     * Total de ingresos agrupados por familia (origenIngreso) de la categoría.
+     * Los ingresos se guardan con importe positivo. Filtra opcionalmente por año/mes.
+     * La familia puede venir null en categorías de ingreso aún sin clasificar.
+     */
+    @Query("select c.origenIngreso, coalesce(sum(t.importe), 0) " +
+            "from TransaccionEntity t join t.categoria c " +
+            "where t.user.id = :userId " +
+            "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
+            "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
+            "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
+            "group by c.origenIngreso")
+    List<Object[]> ingresosPorFamilia(@Param("userId") UUID userId,
+                                      @Param("anio") Integer anio,
+                                      @Param("mes") Integer mes);
+
+    /**
+     * Total de ingresos por año y mes (para la curva de evolución). Devuelve
+     * solo los meses con ingresos; los huecos se rellenan a cero en el servicio.
+     */
+    @Query("select year(t.fechaTransaccion), month(t.fechaTransaccion), coalesce(sum(t.importe), 0) " +
+            "from TransaccionEntity t " +
+            "where t.user.id = :userId " +
+            "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
+            "group by year(t.fechaTransaccion), month(t.fechaTransaccion) " +
+            "order by year(t.fechaTransaccion), month(t.fechaTransaccion)")
+    List<Object[]> ingresosPorMes(@Param("userId") UUID userId);
+
+    /** Total de ingresos por categoría (nombre + familia), de mayor a menor. */
+    @Query("select c.nombreCategoria, c.origenIngreso, coalesce(sum(t.importe), 0) " +
+            "from TransaccionEntity t join t.categoria c " +
+            "where t.user.id = :userId " +
+            "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
+            "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
+            "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
+            "group by c.nombreCategoria, c.origenIngreso " +
+            "order by sum(t.importe) desc")
+    List<Object[]> ingresosPorCategoria(@Param("userId") UUID userId,
+                                        @Param("anio") Integer anio,
+                                        @Param("mes") Integer mes);
 }

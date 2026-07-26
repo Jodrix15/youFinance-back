@@ -1,5 +1,6 @@
 package com.example.finanzas.model;
 
+import com.example.finanzas.model.enums.OrigenIngresoEnum;
 import com.example.finanzas.model.enums.TipoMovimientoEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -29,4 +30,12 @@ public class CategoriaEntity {
     @Column(name = "tipo_movimiento", nullable = false)
     @Enumerated(EnumType.STRING)
     private TipoMovimientoEnum tipo;
+
+    /**
+     * Familia del ingreso (Activo / Pasivo / Inversión). Solo tiene valor cuando
+     * {@code tipo == INGRESO}; en gastos e inversiones es {@code null}.
+     */
+    @Column(name = "origen_ingreso")
+    @Enumerated(EnumType.STRING)
+    private OrigenIngresoEnum origenIngreso;
 }
