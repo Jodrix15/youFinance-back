@@ -4,6 +4,8 @@ import com.example.finanzas.service.CategoriaService;
 import com.example.finanzas.dto.categoria.CrearCategoria;
 import com.example.finanzas.model.CategoriaEntity;
 import com.example.finanzas.model.UserEntity;
+import com.example.finanzas.model.enums.OrigenIngresoEnum;
+import com.example.finanzas.model.enums.TipoMovimientoEnum;
 import com.example.finanzas.repository.CategoriaRepository;
 import com.example.finanzas.repository.GastoRecurrenteRepository;
 import com.example.finanzas.repository.InversionRepository;
@@ -28,6 +30,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         CategoriaEntity categoria = new CategoriaEntity();
         categoria.setNombreCategoria(dto.nombre());
         categoria.setTipo(dto.tipo());
+        categoria.setOrigenIngreso(resolverOrigen(dto));
         categoria.setUser(user);
         return repository.save(categoria);
     }
@@ -48,7 +51,25 @@ public class CategoriaServiceImpl implements CategoriaService {
         }
         categoria.setNombreCategoria(dto.nombre());
         categoria.setTipo(dto.tipo());
+        categoria.setOrigenIngreso(resolverOrigen(dto));
         return repository.save(categoria);
+    }
+
+    /**
+     * La familia (origenIngreso) solo tiene sentido en categorías de ingreso:
+     * es obligatoria cuando el tipo es INGRESO y se ignora (queda null) en el
+     * resto. Cambiar solo la familia de una categoría en uso es seguro porque
+     * no altera el signo del importe de sus movimientos.
+     */
+    private OrigenIngresoEnum resolverOrigen(CrearCategoria dto) {
+        if (dto.tipo() == TipoMovimientoEnum.INGRESO) {
+            if (dto.origenIngreso() == null) {
+                throw new IllegalArgumentException(
+                        "Una categoría de ingreso debe indicar su familia (Activo, Pasivo o Inversión)");
+            }
+            return dto.origenIngreso();
+        }
+        return null;
     }
 
     @Override
