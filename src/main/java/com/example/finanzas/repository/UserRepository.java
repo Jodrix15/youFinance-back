@@ -1,6 +1,7 @@
 package com.example.finanzas.repository;
 
 import com.example.finanzas.model.UserEntity;
+import com.example.finanzas.model.enums.RoleEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
@@ -10,4 +11,6 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByUsername(String username);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+    // Para heredar la disposición del dashboard del admin en usuarios nuevos.
+    Optional<UserEntity> findFirstByRole(RoleEnum role);
 }

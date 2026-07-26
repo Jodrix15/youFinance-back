@@ -17,6 +17,8 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
 
     boolean existsByCategoriaId(Long categoriaId);
 
+    boolean existsByCuentaId(Long cuentaId);
+
     /** Todas las transacciones del usuario en una sola consulta (evita el N+1). */
     @Query("select t from TransaccionEntity t " +
             "join fetch t.cuenta left join fetch t.categoria " +
@@ -55,4 +57,19 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
                                   @Param("anio") Integer anio,
                                   @Param("mes") Integer mes,
                                   @Param("q") String q);
+
+    /** Totales por mes y tipo de un año (flujo de caja del dashboard). */
+    @Query("select month(t.fechaTransaccion), t.tipoMovimiento, coalesce(sum(t.importe), 0) " +
+            "from TransaccionEntity t " +
+            "where t.user.id = :userId and year(t.fechaTransaccion) = :anio " +
+            "group by month(t.fechaTransaccion), t.tipoMovimiento")
+    List<Object[]> totalesPorMesYTipo(@Param("userId") UUID userId, @Param("anio") Integer anio);
+
+    /** Total de gastos por categoría (widget de gastos por categoría). */
+    @Query("select coalesce(t.categoria.nombreCategoria, 'Otros'), coalesce(sum(abs(t.importe)), 0) " +
+            "from TransaccionEntity t " +
+            "where t.user.id = :userId and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.GASTO " +
+            "group by t.categoria.nombreCategoria " +
+            "order by sum(abs(t.importe)) desc")
+    List<Object[]> gastosPorCategoria(@Param("userId") UUID userId);
 }

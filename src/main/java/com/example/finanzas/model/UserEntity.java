@@ -59,6 +59,14 @@ public class UserEntity implements UserDetails {
     @Builder.Default
     private String idioma = "es";
 
+    /**
+     * Configuración personal del dashboard (disposición y visibilidad de widgets)
+     * serializada como JSON. Nullable: si es null, el front usa el layout por defecto.
+     */
+    @Column(columnDefinition = "LONGTEXT")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String dashboardConfig;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(role.name()));

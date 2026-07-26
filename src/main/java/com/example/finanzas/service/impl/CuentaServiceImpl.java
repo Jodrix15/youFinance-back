@@ -52,6 +52,16 @@ public class CuentaServiceImpl implements CuentaService {
         return repository.save(cuenta);
     }
 
+    @Transactional
+    public void deleteCuenta(Long id, UserEntity user) {
+        CuentaEntity cuenta = getCuenta(id, user);
+        if (transaccionRepository.existsByCuentaId(id)) {
+            throw new IllegalStateException(
+                    "No se puede eliminar una cuenta con transacciones asociadas. Elimina primero sus movimientos.");
+        }
+        repository.delete(cuenta);
+    }
+
     public List<TransaccionEntity> getAllTransacciones(Long cuentaId, UserEntity user) {
         return getCuenta(cuentaId, user).getTransacciones();
     }

@@ -110,6 +110,35 @@ public class UserServiceImpl implements UserService {
         return toResponse(user, null);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public String getDashboardConfig(String username) {
+        UserEntity user = findUser(username);
+        String raw = user.getDashboardConfig();
+        if (StringUtils.hasText(raw)) {
+            return raw;
+        }
+        // Usuario sin config propia (p. ej. recién registrado): hereda la
+        // disposición del admin como plantilla, si existe. No se persiste: en
+        // cuanto el usuario reordene su dashboard se guardará la suya propia.
+        if (user.getRole() != RoleEnum.ROLE_ADMIN) {
+            return userRepository.findFirstByRole(RoleEnum.ROLE_ADMIN)
+                    .map(UserEntity::getDashboardConfig)
+                    .filter(StringUtils::hasText)
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    @Override
+    @Transactional
+    public String updateDashboardConfig(String username, String config) {
+        UserEntity user = findUser(username);
+        user.setDashboardConfig(StringUtils.hasText(config) ? config : null);
+        userRepository.save(user);
+        return user.getDashboardConfig();
+    }
+
     private UserEntity findUser(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));

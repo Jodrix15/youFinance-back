@@ -6,10 +6,17 @@ import com.example.finanzas.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Siembra usuarios de demostración (admin/usuario) SOLO cuando
+ * {@code app.demo-users.enabled=true}. Por defecto está desactivado, de modo
+ * que producción nunca arranca con credenciales por defecto conocidas.
+ */
 @Component
+@ConditionalOnProperty(prefix = "app.demo-users", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class DataInitializer implements ApplicationRunner {
 
