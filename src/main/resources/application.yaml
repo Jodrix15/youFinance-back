@@ -1,20 +1,20 @@
 spring:
-  application:
-    name: finanzas
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: "baseline esquema inicial"
   datasource:
-    url: jdbc:mysql://localhost:3306/finanzas
+    url: ${DB_URL:jdbc:mysql://localhost:3306/finanzas_uat}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: root
-    password: "root"
+    username: ${DB_USERNAME:finanzas}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+      ddl-auto: validate
+    show-sql: false
     database-platform: org.hibernate.dialect.MySQLDialect
 
 jwt:
-  secret: ZmluYW56YXMtc2VjcmV0LWtleS1hdC1sZWFzdC0yNTYtYml0cy1sb25nLWZvci1qd3Q=
-  expiration: 86400000
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
