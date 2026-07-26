@@ -1,10 +1,6 @@
 spring:
   application:
     name: finanzas
-  # Migraciones de esquema con Flyway. baseline-on-migrate marca las BDs que ya
-  # tienen tablas (creadas antes por Hibernate) como "en V1" sin ejecutar el V1
-  # ni tocar datos; los V2+ se aplican normalmente. En una BD vacía, ejecuta el
-  # V1 para crear el esquema desde cero.
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -17,7 +13,6 @@ spring:
     password: "root"
   jpa:
     hibernate:
-      # Flyway gestiona el esquema; Hibernate solo valida que coincide.
       ddl-auto: validate
     show-sql: true
     properties:
