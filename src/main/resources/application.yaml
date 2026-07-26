@@ -16,8 +16,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-      show-sql: false
-  database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQLDialect
 
 jwt:
   secret: ${JWT_TOKEN}
