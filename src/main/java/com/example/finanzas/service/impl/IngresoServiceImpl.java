@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,33 +59,54 @@ public class IngresoServiceImpl implements IngresoService {
 
     @Override
     public List<EvolucionIngresoResponse> getEvolucion(UserEntity user) {
-        List<Object[]> filas = transaccionRepository.ingresosPorMes(user.getId());
+        List<Object[]> filas = transaccionRepository.ingresosPorMesYFamilia(user.getId());
         if (filas.isEmpty()) {
             return List.of();
         }
 
-        // Total indexado por mes; los meses sin ingresos se rellenan a cero.
-        Map<YearMonth, BigDecimal> porMes = new HashMap<>();
+        // Desglose por familia indexado por mes; los meses sin ingresos se
+        // rellenan a cero para que la curva no se corte.
+        Map<YearMonth, Map<OrigenIngresoEnum, BigDecimal>> porMes = new HashMap<>();
+        YearMonth inicio = null;
+        YearMonth ultimoDato = null;
         for (Object[] fila : filas) {
-            int anio = ((Number) fila[0]).intValue();
-            int mes = ((Number) fila[1]).intValue();
-            porMes.put(YearMonth.of(anio, mes), new BigDecimal(fila[2].toString()));
+            YearMonth ym = YearMonth.of(((Number) fila[0]).intValue(), ((Number) fila[1]).intValue());
+            // La familia es null cuando la categoría todavía no está clasificada.
+            OrigenIngresoEnum familia = (OrigenIngresoEnum) fila[2];
+            BigDecimal suma = new BigDecimal(fila[3].toString());
+
+            porMes.computeIfAbsent(ym, k -> new HashMap<>())
+                    .merge(familia, suma, BigDecimal::add);
+
+            if (inicio == null || ym.isBefore(inicio)) {
+                inicio = ym;
+            }
+            if (ultimoDato == null || ym.isAfter(ultimoDato)) {
+                ultimoDato = ym;
+            }
         }
 
-        Object[] primera = filas.get(0);
-        YearMonth inicio = YearMonth.of(((Number) primera[0]).intValue(), ((Number) primera[1]).intValue());
         YearMonth fin = YearMonth.now();
         // Si hubiera ingresos con fecha futura, no cortamos la serie antes de ellos.
-        Object[] ultima = filas.get(filas.size() - 1);
-        YearMonth ultimoDato = YearMonth.of(((Number) ultima[0]).intValue(), ((Number) ultima[1]).intValue());
         if (ultimoDato.isAfter(fin)) {
             fin = ultimoDato;
         }
 
         List<EvolucionIngresoResponse> serie = new ArrayList<>();
         for (YearMonth ym = inicio; !ym.isAfter(fin); ym = ym.plusMonths(1)) {
-            BigDecimal total = porMes.getOrDefault(ym, BigDecimal.ZERO);
-            serie.add(new EvolucionIngresoResponse(ym.atDay(1).toString(), total));
+            // Collections.emptyMap() y no Map.of(): este último no admite
+            // consultas con clave null, y null es la familia "sin clasificar".
+            Map<OrigenIngresoEnum, BigDecimal> mesActual =
+                    porMes.getOrDefault(ym, Collections.emptyMap());
+            BigDecimal activo = mesActual.getOrDefault(OrigenIngresoEnum.ACTIVO, BigDecimal.ZERO);
+            BigDecimal pasivo = mesActual.getOrDefault(OrigenIngresoEnum.PASIVO, BigDecimal.ZERO);
+            BigDecimal inversion = mesActual.getOrDefault(OrigenIngresoEnum.INVERSION, BigDecimal.ZERO);
+            // La clave null agrupa las categorías sin familia asignada.
+            BigDecimal sinClasificar = mesActual.getOrDefault(null, BigDecimal.ZERO);
+            BigDecimal total = activo.add(pasivo).add(inversion).add(sinClasificar);
+
+            serie.add(new EvolucionIngresoResponse(
+                    ym.atDay(1).toString(), total, activo, pasivo, inversion, sinClasificar));
         }
         return serie;
     }

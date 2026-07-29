@@ -90,16 +90,18 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
                                       @Param("mes") Integer mes);
 
     /**
-     * Total de ingresos por año y mes (para la curva de evolución). Devuelve
-     * solo los meses con ingresos; los huecos se rellenan a cero en el servicio.
+     * Ingresos por año, mes y familia de la categoría (para la curva de
+     * evolución y su desglose). Devuelve solo los meses con ingresos; los
+     * huecos se rellenan a cero en el servicio. La familia puede ser null:
+     * categorías todavía sin clasificar.
      */
-    @Query("select year(t.fechaTransaccion), month(t.fechaTransaccion), coalesce(sum(t.importe), 0) " +
-            "from TransaccionEntity t " +
+    @Query("select year(t.fechaTransaccion), month(t.fechaTransaccion), c.origenIngreso, coalesce(sum(t.importe), 0) " +
+            "from TransaccionEntity t join t.categoria c " +
             "where t.user.id = :userId " +
             "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
-            "group by year(t.fechaTransaccion), month(t.fechaTransaccion) " +
+            "group by year(t.fechaTransaccion), month(t.fechaTransaccion), c.origenIngreso " +
             "order by year(t.fechaTransaccion), month(t.fechaTransaccion)")
-    List<Object[]> ingresosPorMes(@Param("userId") UUID userId);
+    List<Object[]> ingresosPorMesYFamilia(@Param("userId") UUID userId);
 
     /** Total de ingresos por categoría (nombre + familia), de mayor a menor. */
     @Query("select c.nombreCategoria, c.origenIngreso, coalesce(sum(t.importe), 0) " +
