@@ -1,0 +1,125 @@
+# ── Blueprint de Render para YouFinance (backend) ─────────────────────────────
+# Un servicio por entorno; la RAMA decide el entorno:
+#
+#   develop → youfinance-back      (UAT)  → servicio y BD que YA existen
+#   main    → youfinance-back-pro  (PRO)  → servicio NUEVO + BD nueva de Aiven
+#
+# El servicio `youfinance-back` no se toca de nombre: conserva su URL
+# (youfinance-back.onrender.com), que es a la que ya apunta el front, y pasa a
+# ser el entorno de pruebas. Producción estrena servicio y base de datos.
+#
+# Los secretos van con `sync: false`: Render NO los lee de aquí, los pides una
+# vez en el dashboard (o al sincronizar el blueprint) y quedan guardados en el
+# servicio. Nunca se commitean.
+#
+# Sincronizar: Render → Blueprints → New Blueprint Instance → repo youFinance-back,
+# rama `main`. A partir de ahí, cada push a main/develop redespliega su servicio.
+
+services:
+  # ── UAT / PRUEBAS (servicio existente, cambia de rama a develop) ────────────
+  - type: web
+    name: youfinance-back          # NO cambiar: fija la URL youfinance-back.onrender.com
+                                   # y debe coincidir EXACTO con el servicio que ya
+                                   # tienes para que el blueprint lo adopte en vez
+                                   # de crear uno nuevo con sufijo.
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    repo: https://github.com/Jodrix15/youFinance-back
+    branch: develop                # antes main; a partir de ahora despliega develop
+    plan: free
+    region: frankfurt              # debe coincidir con la región del servicio actual
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: uat
+
+      # ── Base de datos ──
+      # Se queda con la BD actual (la que ya usaba producción). Si el servicio ya
+      # existe, Render conserva los valores que tenga guardados.
+      # El yaml compone la URL como  jdbc:${DATASOURCE_URL}
+      # → el valor NO lleva el prefijo "jdbc:". Ejemplo:
+      #   mysql://host-xxxx.aivencloud.com:12345/defaultdb?sslMode=REQUIRED
+      - key: DATASOURCE_URL
+        sync: false
+      - key: DATASOURCE_USERNAME
+        sync: false
+      - key: DATASOURCE_PASSWORD
+        sync: false
+
+      # ── JWT ──
+      - key: JWT_TOKEN               # Base64, 256+ bits. Distinto del de PRO.
+        sync: false
+      - key: EXPIRATION_TOKEN
+        value: "86400000"            # 24 h
+
+      # ── CORS ──
+      # Dominio de preview de Vercel para la rama develop + dev local.
+      # Ajusta el primero al que te dé Vercel tras el primer deploy de develop.
+      # Con el rewrite /api de vercel.json el tráfico es mismo-origen y CORS casi
+      # no interviene, pero se deja acotado por si se llama al back directamente.
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://you-finance-git-develop-jodrix15.vercel.app,http://localhost:5173
+
+      # ── Cookie de sesión ──
+      # OJO con los nombres: las propiedades son auth.cookie.secure y
+      # auth.cookie.same-site; el relaxed binding de Spring espera el guion como
+      # guion bajo → AUTH_COOKIE_SAME_SITE (no AUTH_COOKIE_SAMESITE).
+      - key: AUTH_COOKIE_NAME
+        value: ACCESS_TOKEN
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_COOKIE_SAME_SITE
+        value: None                  # None funciona proxied y directo. Si algún día
+                                     # sirves front y back en el mismo sitio, Lax.
+      - key: AUTH_LOGIN_MAX_ATTEMPTS
+        value: "10"
+      - key: AUTH_LOGIN_WINDOW_SECONDS
+        value: "300"
+
+      - key: JAVA_OPTS
+        value: -XX:+UseSerialGC -Xss512k -XX:MaxRAMPercentage=70.0
+
+  # ── PRODUCCIÓN (servicio nuevo) ─────────────────────────────────────────────
+  - type: web
+    name: youfinance-back-pro        # → youfinance-back-pro.onrender.com
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    repo: https://github.com/Jodrix15/youFinance-back
+    branch: main
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: pro
+
+      # ── Base de datos: la BD NUEVA de Aiven ──
+      # Vacía: Flyway ejecutará V1 → V3 en el primer arranque. Sin dump.
+      - key: DATASOURCE_URL
+        sync: false
+      - key: DATASOURCE_USERNAME
+        sync: false
+      - key: DATASOURCE_PASSWORD
+        sync: false
+
+      - key: JWT_TOKEN                # secreto propio, distinto del de UAT
+        sync: false
+      - key: EXPIRATION_TOKEN
+        value: "86400000"
+
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://you-finance.vercel.app
+
+      - key: AUTH_COOKIE_NAME
+        value: ACCESS_TOKEN
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_COOKIE_SAME_SITE
+        value: None
+      - key: AUTH_LOGIN_MAX_ATTEMPTS
+        value: "10"
+      - key: AUTH_LOGIN_WINDOW_SECONDS
+        value: "300"
+
+      - key: JAVA_OPTS
+        value: -XX:+UseSerialGC -Xss512k -XX:MaxRAMPercentage=70.0
