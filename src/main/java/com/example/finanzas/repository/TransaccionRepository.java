@@ -65,11 +65,11 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
             "group by month(t.fechaTransaccion), t.tipoMovimiento")
     List<Object[]> totalesPorMesYTipo(@Param("userId") UUID userId, @Param("anio") Integer anio);
 
-    /** Total de gastos por categoría (widget de gastos por categoría). */
-    @Query("select coalesce(t.categoria.nombreCategoria, 'Otros'), coalesce(sum(abs(t.importe)), 0) " +
+    /** Total de gastos por categoría, con su color (widget de gastos por categoría). */
+    @Query("select coalesce(t.categoria.nombreCategoria, 'Otros'), t.categoria.color, coalesce(sum(abs(t.importe)), 0) " +
             "from TransaccionEntity t " +
             "where t.user.id = :userId and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.GASTO " +
-            "group by t.categoria.nombreCategoria " +
+            "group by t.categoria.nombreCategoria, t.categoria.color " +
             "order by sum(abs(t.importe)) desc")
     List<Object[]> gastosPorCategoria(@Param("userId") UUID userId);
 
@@ -103,14 +103,14 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
             "order by year(t.fechaTransaccion), month(t.fechaTransaccion)")
     List<Object[]> ingresosPorMesYFamilia(@Param("userId") UUID userId);
 
-    /** Total de ingresos por categoría (nombre + familia), de mayor a menor. */
-    @Query("select c.nombreCategoria, c.origenIngreso, coalesce(sum(t.importe), 0) " +
+    /** Total de ingresos por categoría (nombre + familia + color), de mayor a menor. */
+    @Query("select c.nombreCategoria, c.origenIngreso, c.color, coalesce(sum(t.importe), 0) " +
             "from TransaccionEntity t join t.categoria c " +
             "where t.user.id = :userId " +
             "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
             "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
             "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
-            "group by c.nombreCategoria, c.origenIngreso " +
+            "group by c.nombreCategoria, c.origenIngreso, c.color " +
             "order by sum(t.importe) desc")
     List<Object[]> ingresosPorCategoria(@Param("userId") UUID userId,
                                         @Param("anio") Integer anio,

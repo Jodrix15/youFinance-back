@@ -8,14 +8,16 @@ public record CategoriaResponse(
         Long id,
         String nombre,
         TipoMovimientoEnum tipo,
-        OrigenIngresoEnum origenIngreso
+        OrigenIngresoEnum origenIngreso,
+        String color
 ) {
     public static CategoriaResponse from(CategoriaEntity categoria) {
         return new CategoriaResponse(
                 categoria.getId(),
                 categoria.getNombreCategoria(),
                 categoria.getTipo(),
-                categoria.getOrigenIngreso()
+                categoria.getOrigenIngreso(),
+                categoria.getColor()
         );
     }
 }

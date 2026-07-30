@@ -147,6 +147,7 @@ public class InversionServiceImpl implements InversionService {
                     return new DistribucionCategoriaResponse(
                             categoria.getId(),
                             categoria.getNombreCategoria(),
+                            categoria.getColor(),
                             capitalCategoria,
                             porcentaje
                     );

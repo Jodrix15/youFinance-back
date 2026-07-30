@@ -53,7 +53,8 @@ public class IngresoServiceImpl implements IngresoService {
                 .map(fila -> new IngresoCategoriaResponse(
                         (String) fila[0],
                         (OrigenIngresoEnum) fila[1],
-                        new BigDecimal(fila[2].toString())))
+                        (String) fila[2],
+                        new BigDecimal(fila[3].toString())))
                 .toList();
     }
 
