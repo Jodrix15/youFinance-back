@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,20 +20,44 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
 
     boolean existsByCuentaId(Long cuentaId);
 
+    /** Los dos apuntes de una misma transferencia. */
+    List<TransaccionEntity> findByTransferenciaId(String transferenciaId);
+
+    /** ¿Alguna transferencia apunta a esta cuenta como contrapartida? */
+    boolean existsByCuentaContrapartidaId(Long cuentaId);
+
+    /**
+     * Suma con signo de los movimientos de cada cuenta del usuario.
+     * Base del saldo derivado: saldo = cuenta.saldoInicial + esta suma.
+     */
+    @Query("select t.cuenta.id, coalesce(sum(t.importe), 0) from TransaccionEntity t " +
+            "where t.cuenta.user.id = :userId " +
+            "group by t.cuenta.id")
+    List<Object[]> sumaPorCuenta(@Param("userId") UUID userId);
+
+    /** Suma con signo de los movimientos de una sola cuenta. */
+    @Query("select coalesce(sum(t.importe), 0) from TransaccionEntity t where t.cuenta.id = :cuentaId")
+    BigDecimal sumaDeCuenta(@Param("cuentaId") Long cuentaId);
+
     /** Todas las transacciones del usuario en una sola consulta (evita el N+1). */
     @Query("select t from TransaccionEntity t " +
             "join fetch t.cuenta left join fetch t.categoria " +
+            "left join fetch t.cuentaContrapartida " +
             "where t.user.id = :userId")
     List<TransaccionEntity> findAllByUserIdFetch(@Param("userId") UUID userId);
 
-    /** Búsqueda paginada/filtrada. El texto :q llega ya en minúsculas y con %..%. */
-    @Query("select t from TransaccionEntity t where t.user.id = :userId " +
+    /**
+     * Búsqueda paginada/filtrada. El texto :q llega ya en minúsculas y con %..%.
+     * El join con categoría es LEFT: las transferencias no tienen categoría y un
+     * inner join implícito las dejaría fuera del listado.
+     */
+    @Query("select t from TransaccionEntity t left join t.categoria c where t.user.id = :userId " +
             "and (:tipo is null or t.tipoMovimiento = :tipo) " +
             "and (:cuentaId is null or t.cuenta.id = :cuentaId) " +
             "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
             "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
             "and (:q is null or lower(t.descripcion) like :q " +
-            "or lower(t.categoria.nombreCategoria) like :q)")
+            "or lower(c.nombreCategoria) like :q)")
     Page<TransaccionEntity> buscar(@Param("userId") UUID userId,
                                    @Param("tipo") TipoMovimientoEnum tipo,
                                    @Param("cuentaId") Long cuentaId,
@@ -41,15 +66,20 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
                                    @Param("q") String q,
                                    Pageable pageable);
 
-    /** Totales por tipo del conjunto filtrado (para los KPIs). */
+    /**
+     * Totales por tipo del conjunto filtrado (para los KPIs). Devuelve también
+     * la fila de TRANSFERENCIA; los consumidores la ignoran porque un traspaso
+     * no es ni ingreso ni gasto.
+     */
     @Query("select t.tipoMovimiento, coalesce(sum(t.importe), 0) from TransaccionEntity t " +
+            "left join t.categoria c " +
             "where t.user.id = :userId " +
             "and (:tipo is null or t.tipoMovimiento = :tipo) " +
             "and (:cuentaId is null or t.cuenta.id = :cuentaId) " +
             "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
             "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
             "and (:q is null or lower(t.descripcion) like :q " +
-            "or lower(t.categoria.nombreCategoria) like :q) " +
+            "or lower(c.nombreCategoria) like :q) " +
             "group by t.tipoMovimiento")
     List<Object[]> resumenPorTipo(@Param("userId") UUID userId,
                                   @Param("tipo") TipoMovimientoEnum tipo,
@@ -58,18 +88,22 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
                                   @Param("mes") Integer mes,
                                   @Param("q") String q);
 
-    /** Totales por mes y tipo de un año (flujo de caja del dashboard). */
+    /**
+     * Totales por mes y tipo de un año (flujo de caja del dashboard).
+     * Excluye transferencias: mover dinero entre cuentas propias no es flujo.
+     */
     @Query("select month(t.fechaTransaccion), t.tipoMovimiento, coalesce(sum(t.importe), 0) " +
             "from TransaccionEntity t " +
             "where t.user.id = :userId and year(t.fechaTransaccion) = :anio " +
+            "and t.tipoMovimiento <> com.example.finanzas.model.enums.TipoMovimientoEnum.TRANSFERENCIA " +
             "group by month(t.fechaTransaccion), t.tipoMovimiento")
     List<Object[]> totalesPorMesYTipo(@Param("userId") UUID userId, @Param("anio") Integer anio);
 
     /** Total de gastos por categoría, con su color (widget de gastos por categoría). */
-    @Query("select coalesce(t.categoria.nombreCategoria, 'Otros'), t.categoria.color, coalesce(sum(abs(t.importe)), 0) " +
-            "from TransaccionEntity t " +
+    @Query("select coalesce(c.nombreCategoria, 'Otros'), c.color, coalesce(sum(abs(t.importe)), 0) " +
+            "from TransaccionEntity t left join t.categoria c " +
             "where t.user.id = :userId and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.GASTO " +
-            "group by t.categoria.nombreCategoria, t.categoria.color " +
+            "group by c.nombreCategoria, c.color " +
             "order by sum(abs(t.importe)) desc")
     List<Object[]> gastosPorCategoria(@Param("userId") UUID userId);
 
