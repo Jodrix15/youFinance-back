@@ -16,10 +16,28 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CategoriaServiceImpl implements CategoriaService {
+
+    /**
+     * Paleta de marca, en el mismo orden que la del front ({@code lib/chartSetup.ts}).
+     * Es la lista de colores entre los que se elige cuando el usuario no indica
+     * ninguno, y también la que se le ofrece en el formulario.
+     */
+    private static final List<String> PALETA = List.of(
+            "#2f81f7", // azul
+            "#1d9e75", // verde
+            "#d29922", // ámbar
+            "#8b7ec8", // morado
+            "#d85a30", // coral
+            "#d4537e", // rosa
+            "#6e7681"  // gris
+    );
 
     private final CategoriaRepository repository;
     private final TransaccionRepository transaccionRepository;
@@ -31,6 +49,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         categoria.setNombreCategoria(dto.nombre());
         categoria.setTipo(dto.tipo());
         categoria.setOrigenIngreso(resolverOrigen(dto));
+        categoria.setColor(resolverColor(dto.color(), dto.tipo(), user, null));
         categoria.setUser(user);
         return repository.save(categoria);
     }
@@ -52,7 +71,41 @@ public class CategoriaServiceImpl implements CategoriaService {
         categoria.setNombreCategoria(dto.nombre());
         categoria.setTipo(dto.tipo());
         categoria.setOrigenIngreso(resolverOrigen(dto));
+        // Sin color en la petición se vuelve al reparto automático: es lo que
+        // significa la opción "automático" del formulario.
+        categoria.setColor(resolverColor(dto.color(), dto.tipo(), user, categoria.getId()));
         return repository.save(categoria);
+    }
+
+    /**
+     * Color definitivo de la categoría. Si el usuario elige uno se respeta tal
+     * cual (normalizado a minúsculas); si no indica ninguno se toma el primer
+     * color de la paleta que no esté ya usado por otra categoría del mismo
+     * tipo, de forma que dos categorías hermanas nunca nacen con el mismo
+     * color. Si la paleta se ha agotado se reparte cíclicamente.
+     *
+     * @param idActual id de la categoría que se está editando (null al crear):
+     *                 su propio color no cuenta como "ocupado".
+     */
+    private String resolverColor(String colorElegido, TipoMovimientoEnum tipo, UserEntity user, Long idActual) {
+        if (colorElegido != null && !colorElegido.isBlank()) {
+            return colorElegido.trim().toLowerCase(Locale.ROOT);
+        }
+
+        List<CategoriaEntity> hermanas = repository.findByUserIdAndTipo(user.getId(), tipo);
+        Set<String> ocupados = hermanas.stream()
+                .filter(c -> !c.getId().equals(idActual))
+                .map(CategoriaEntity::getColor)
+                .filter(c -> c != null && !c.isBlank())
+                .map(c -> c.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+
+        return PALETA.stream()
+                .filter(c -> !ocupados.contains(c))
+                .findFirst()
+                // Con más categorías que colores ya no hay ninguno libre: se
+                // reparte la paleta en ciclo para no dejar la categoría sin color.
+                .orElseGet(() -> PALETA.get(ocupados.size() % PALETA.size()));
     }
 
     /**

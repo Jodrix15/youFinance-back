@@ -29,14 +29,33 @@ public class CuentaEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
 
-    @Column(nullable = false)
-    private BigDecimal importe =  BigDecimal.ZERO;
+    /**
+     * Saldo de partida de la cuenta, el que teclea el usuario al crearla.
+     * Es un dato inmutable del histórico: NO se toca al registrar movimientos.
+     */
+    @Column(name = "saldo_inicial", nullable = false)
+    private BigDecimal saldoInicial = BigDecimal.ZERO;
 
     @OneToMany(mappedBy = "cuenta")
     private List<TransaccionEntity> transacciones = new ArrayList<>();
 
-    public void aplicarTransaccion(TransaccionEntity transaccion){
-        this.importe = this.importe.add(transaccion.getImporteConSigno());
+    /**
+     * Saldo actual = saldoInicial + suma de las transacciones de la cuenta.
+     * No se persiste: lo rellena el servicio al leer, con una sola consulta
+     * agregada. Antes era una columna que se mutaba en cada escritura y bastaba
+     * un fallo en cualquiera de ellas para que quedara desincronizada para
+     * siempre; derivarlo hace que ese error sea imposible por construcción.
+     */
+    @Transient
+    private BigDecimal saldo;
+
+    public BigDecimal getSaldo() {
+        return saldo != null ? saldo : saldoInicial;
     }
 
+    /** Rellena el saldo calculado a partir de la suma de movimientos. */
+    public void hidratarSaldo(BigDecimal sumaTransacciones) {
+        BigDecimal base = saldoInicial != null ? saldoInicial : BigDecimal.ZERO;
+        this.saldo = base.add(sumaTransacciones != null ? sumaTransacciones : BigDecimal.ZERO);
+    }
 }

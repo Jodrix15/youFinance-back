@@ -7,9 +7,16 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * @param categoriaId    obligatorio salvo en TRANSFERENCIA, donde debe venir vacío.
+ * @param cuentaDestinoId obligatorio solo en TRANSFERENCIA; debe ser distinto de la cuenta origen.
+ *                        La coherencia entre tipo, categoría y destino se valida en el servicio,
+ *                        que es donde se puede comprobar la propiedad de la cuenta destino.
+ */
 public record TransaccionDTO(
         @NotNull(message = "El tipo de movimiento es obligatorio") TipoMovimientoEnum tipoMovimiento,
-        @NotNull(message = "La categoría es obligatoria") Long categoriaId,
+        Long categoriaId,
+        Long cuentaDestinoId,
         @NotNull(message = "El importe es obligatorio")
         @Positive(message = "El importe debe ser mayor que cero") BigDecimal importe,
         String descripcion,
