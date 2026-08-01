@@ -16,7 +16,10 @@ public record MovimientoResponse(
         String categoriaNombre,
         BigDecimal importe,
         String descripcion,
-        LocalDate fechaTransaccion
+        LocalDate fechaTransaccion,
+        String transferenciaId,
+        Long cuentaContrapartidaId,
+        String cuentaContrapartidaNombre
 ) {
     public static MovimientoResponse from(TransaccionEntity t) {
         return new MovimientoResponse(
@@ -28,7 +31,10 @@ public record MovimientoResponse(
                 t.getCategoria() != null ? t.getCategoria().getNombreCategoria() : null,
                 t.getImporte(),
                 t.getDescripcion(),
-                t.getFechaTransaccion()
+                t.getFechaTransaccion(),
+                t.getTransferenciaId(),
+                t.getCuentaContrapartida() != null ? t.getCuentaContrapartida().getId() : null,
+                t.getCuentaContrapartida() != null ? t.getCuentaContrapartida().getNombreCuenta() : null
         );
     }
 }

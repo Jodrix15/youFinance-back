@@ -38,4 +38,12 @@ public class CategoriaEntity {
     @Column(name = "origen_ingreso")
     @Enumerated(EnumType.STRING)
     private OrigenIngresoEnum origenIngreso;
+
+    /**
+     * Color con el que se pinta la categoría en gráficos y listados, en hex
+     * {@code #rrggbb}. El usuario no está obligado a elegirlo: si no lo hace,
+     * el servicio asigna el primer color libre de la paleta dentro de su tipo.
+     */
+    @Column(name = "color", length = 7)
+    private String color;
 }

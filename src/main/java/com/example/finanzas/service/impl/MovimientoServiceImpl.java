@@ -9,7 +9,9 @@ import com.example.finanzas.repository.TransaccionRepository;
 import com.example.finanzas.service.MovimientoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -31,7 +33,8 @@ public class MovimientoServiceImpl implements MovimientoService {
                                           Pageable pageable) {
         String like = (q == null || q.isBlank()) ? null : "%" + q.toLowerCase() + "%";
 
-        Page<TransaccionEntity> page = repository.buscar(user.getId(), tipo, cuentaId, anio, mes, like, pageable);
+        Page<TransaccionEntity> page = repository.buscar(user.getId(), tipo, cuentaId, anio, mes, like,
+                ordenarPorAliasDeCategoria(pageable));
         List<MovimientoResponse> contenido = page.getContent().stream()
                 .map(MovimientoResponse::from)
                 .toList();
@@ -47,6 +50,9 @@ public class MovimientoServiceImpl implements MovimientoService {
                 case INGRESO -> ingresos = total;
                 case GASTO -> gastos = total.abs();
                 case INVERSION -> inversiones = total.abs();
+                // Un traspaso entre cuentas propias no es ni ingreso ni gasto:
+                // no entra en ningún KPI (y sus dos apuntes se anulan entre sí).
+                case TRANSFERENCIA -> { }
             }
         }
 
@@ -61,6 +67,24 @@ public class MovimientoServiceImpl implements MovimientoService {
                 inversiones,
                 ingresos.subtract(gastos)
         );
+    }
+
+    /**
+     * Reescribe el orden "categoria.nombreCategoria" para que use el alias del
+     * LEFT JOIN declarado en la consulta. Si se dejara la ruta implícita,
+     * Hibernate generaría un INNER JOIN en el ORDER BY y las transferencias
+     * (que no tienen categoría) desaparecerían del listado al ordenar por ella.
+     */
+    private static Pageable ordenarPorAliasDeCategoria(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+        List<Sort.Order> ordenes = pageable.getSort().stream()
+                .map(o -> "categoria.nombreCategoria".equals(o.getProperty())
+                        ? new Sort.Order(o.getDirection(), "c.nombreCategoria")
+                        : o)
+                .toList();
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(ordenes));
     }
 
     @Override

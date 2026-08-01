@@ -53,7 +53,8 @@ public class IngresoServiceImpl implements IngresoService {
                 .map(fila -> new IngresoCategoriaResponse(
                         (String) fila[0],
                         (OrigenIngresoEnum) fila[1],
-                        new BigDecimal(fila[2].toString())))
+                        (String) fila[2],
+                        new BigDecimal(fila[3].toString())))
                 .toList();
     }
 
@@ -86,11 +87,12 @@ public class IngresoServiceImpl implements IngresoService {
             }
         }
 
-        YearMonth fin = YearMonth.now();
-        // Si hubiera ingresos con fecha futura, no cortamos la serie antes de ellos.
-        if (ultimoDato.isAfter(fin)) {
-            fin = ultimoDato;
-        }
+        // La serie termina en el último mes CON ingresos, no en el mes actual.
+        // Prolongarla hasta hoy añadía ceros al final y la curva se desplomaba
+        // en cuanto empezaba un mes nuevo, aunque solo fuera porque todavía no
+        // se ha registrado nada. Los huecos intermedios sí se rellenan a cero:
+        // ahí el cero es un dato real (ese mes no hubo ingresos).
+        YearMonth fin = ultimoDato;
 
         List<EvolucionIngresoResponse> serie = new ArrayList<>();
         for (YearMonth ym = inicio; !ym.isAfter(fin); ym = ym.plusMonths(1)) {

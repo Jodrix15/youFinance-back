@@ -148,7 +148,8 @@ public class DashboardServiceImpl implements DashboardService {
         return transaccionRepository.gastosPorCategoria(user.getId()).stream()
                 .map(fila -> new GastoCategoriaResponse(
                         (String) fila[0],
-                        new BigDecimal(fila[1].toString())))
+                        (String) fila[1],
+                        new BigDecimal(fila[2].toString())))
                 .toList();
     }
 

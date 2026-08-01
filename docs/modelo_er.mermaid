@@ -10,7 +10,11 @@ erDiagram
     USUARIO ||--o{ INVERSION        : "tiene"
     USUARIO ||--o{ PATRIMONIO_SNAPSHOT : "acumula"
 
-    CATEGORIA ||--o{ TRANSACCION    : "clasifica"
+    USUARIO ||--o{ CUENTA           : "tiene"
+    CUENTA  ||--o{ TRANSACCION      : "registra"
+    CUENTA  ||--o{ TRANSACCION      : "contrapartida (transferencias)"
+
+    CATEGORIA ||--o{ TRANSACCION    : "clasifica (null en transferencias)"
     CATEGORIA ||--o{ RECURRENTE     : "clasifica"
     CATEGORIA ||--o{ SUSCRIPCION    : "clasifica"
 
@@ -32,13 +36,23 @@ erDiagram
         enum     tipo "GASTO / INGRESO / MIXTO"
     }
 
+    CUENTA {
+        bigint   id PK
+        bigint   usuario_id FK
+        varchar  nombre
+        decimal  saldo_inicial "saldo de partida; el actual se deriva sumando las transacciones"
+    }
+
     TRANSACCION {
         bigint   id PK
         bigint   usuario_id FK
-        bigint   categoria_id FK
-        enum     tipo "GASTO / INGRESO"
+        bigint   cuenta_id FK
+        bigint   categoria_id FK "null en transferencias"
+        bigint   cuenta_contrapartida_id FK "la otra cuenta del traspaso"
+        varchar  transferencia_id "mismo valor en los dos apuntes de una transferencia"
+        enum     tipo "GASTO / INGRESO / INVERSION / TRANSFERENCIA"
         varchar  descripcion
-        decimal  importe
+        decimal  importe "con signo: negativo si sale de la cuenta"
         date     fecha
     }
 

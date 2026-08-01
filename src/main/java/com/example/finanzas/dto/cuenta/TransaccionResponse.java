@@ -6,6 +6,11 @@ import com.example.finanzas.model.enums.TipoMovimientoEnum;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * @param transferenciaId          no nulo solo en transferencias; identifica el par de apuntes.
+ * @param cuentaContrapartidaId    la otra cuenta del traspaso (destino si el importe es negativo,
+ *                                 origen si es positivo).
+ */
 public record TransaccionResponse(
         Long id,
         Long cuentaId,
@@ -14,7 +19,10 @@ public record TransaccionResponse(
         String categoriaNombre,
         BigDecimal importe,
         String descripcion,
-        LocalDate fechaTransaccion
+        LocalDate fechaTransaccion,
+        String transferenciaId,
+        Long cuentaContrapartidaId,
+        String cuentaContrapartidaNombre
 ) {
     public static TransaccionResponse from(TransaccionEntity transaccion) {
         return new TransaccionResponse(
@@ -25,7 +33,10 @@ public record TransaccionResponse(
                 transaccion.getCategoria() != null ? transaccion.getCategoria().getNombreCategoria() : null,
                 transaccion.getImporte(),
                 transaccion.getDescripcion(),
-                transaccion.getFechaTransaccion()
+                transaccion.getFechaTransaccion(),
+                transaccion.getTransferenciaId(),
+                transaccion.getCuentaContrapartida() != null ? transaccion.getCuentaContrapartida().getId() : null,
+                transaccion.getCuentaContrapartida() != null ? transaccion.getCuentaContrapartida().getNombreCuenta() : null
         );
     }
 }
