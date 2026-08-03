@@ -20,9 +20,11 @@ public record GastoRecurrenteResponse(
         LocalDate fechaPrimerPago,
         LocalDate fechaUltimoPago,
         LocalDate fechaProximoPago,
+        LocalDate fechaFin,
         boolean active,
         BigDecimal importeActual,
-        List<RecurrentePrecioResponse> historial
+        List<RecurrentePrecioResponse> historial,
+        List<RecurrentePeriodoResponse> periodos
 ) {
     public static GastoRecurrenteResponse from(GastoRecurrenteEntity gasto) {
         List<RecurrentePrecioEntity> precios = gasto.getHistorial() != null
@@ -49,9 +51,13 @@ public record GastoRecurrenteResponse(
                 gasto.getFechaPrimerPago(),
                 gasto.getFechaUltimoPago(),
                 gasto.getFechaProximoPago(),
+                gasto.getFechaFin(),
                 gasto.isActive(),
                 importeActual,
-                historial
+                historial,
+                gasto.getPeriodosOrdenados().stream()
+                        .map(RecurrentePeriodoResponse::from)
+                        .toList()
         );
     }
 }

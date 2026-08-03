@@ -10,6 +10,7 @@ import com.example.finanzas.model.UserEntity;
 import com.example.finanzas.model.enums.FrecuenciaEnum;
 import com.example.finanzas.model.enums.TipoPagoEnum;
 import com.example.finanzas.model.Gastos.GastoRecurrenteEntity;
+import com.example.finanzas.model.Gastos.RecurrentePeriodoEntity;
 import com.example.finanzas.model.Gastos.RecurrentePrecioEntity;
 import com.example.finanzas.repository.CategoriaRepository;
 import com.example.finanzas.repository.GastoRecurrenteRepository;
@@ -89,9 +90,10 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         gastoRecurrente.setNombre(gastoRecurrenteDTO.nombre());
         gastoRecurrente.setFrecuencia(gastoRecurrenteDTO.frecuencia());
         gastoRecurrente.setTipoPago(gastoRecurrenteDTO.tipoPago());
-        gastoRecurrente.setActive(gastoRecurrenteDTO.active());
-        gastoRecurrente.setFechaPrimerPago(gastoRecurrenteDTO.fechaPrimerPago());
-        gastoRecurrente.setFechaUltimoPago(gastoRecurrenteDTO.fechaUltimoPago());
+        // Nace activo, con su primer periodo abierto desde la fecha de primer pago.
+        gastoRecurrente.setActive(true);
+        gastoRecurrente.getPeriodos()
+                .add(abrirPeriodo(gastoRecurrente, gastoRecurrenteDTO.fechaPrimerPago()));
 
         GastoRecurrenteEntity guardado = repository.save(gastoRecurrente);
 
@@ -104,16 +106,40 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         return guardado;
     }
 
+    @Transactional
     public GastoRecurrenteEntity update(Long id, ActualizarGasto datosActualizados, UserEntity user) {
         GastoRecurrenteEntity existente = getGastoRecurrente(id, user);
+        boolean estabaActivo = existente.isActive();
+        boolean quedaActivo = datosActualizados.active();
+
         existente.setNombre(datosActualizados.nombre());
         existente.setCategoria(resolverCategoria(datosActualizados.categoriaId(), user));
         existente.setTipoPago(datosActualizados.tipoPago());
         existente.setFrecuencia(datosActualizados.frecuencia());
-        existente.setActive(datosActualizados.active());
-        existente.setFechaPrimerPago(datosActualizados.fechaPrimerPago());
-        existente.setFechaUltimoPago(datosActualizados.fechaUltimoPago());
+        existente.setActive(quedaActivo);
+
+        // El ciclo de vida lo lleva el servidor, no el formulario. Dar de baja
+        // cierra el periodo vigente y reactivar abre otro nuevo: el tramo anterior
+        // se conserva entero, con sus fechas y sus pagos.
+        if (estabaActivo && !quedaActivo) {
+            existente.getPeriodoActual().ifPresent(p -> p.setFechaFin(LocalDate.now()));
+        } else if (!estabaActivo && quedaActivo) {
+            existente.getPeriodos().add(abrirPeriodo(existente, LocalDate.now()));
+        } else {
+            // Sin cambio de estado el formulario sí puede corregir el alta del tramo.
+            existente.getUltimoPeriodo()
+                    .ifPresent(p -> p.setFechaInicio(datosActualizados.fechaPrimerPago()));
+        }
+
         return repository.save(existente);
+    }
+
+    /** Nuevo tramo de vida abierto en la fecha indicada, aún sin pagos. */
+    private static RecurrentePeriodoEntity abrirPeriodo(GastoRecurrenteEntity gasto, LocalDate desde) {
+        RecurrentePeriodoEntity periodo = new RecurrentePeriodoEntity();
+        periodo.setGastoRecurrente(gasto);
+        periodo.setFechaInicio(desde);
+        return periodo;
     }
 
     public RecurrentePrecioEntity registrarNuevoPrecio(Long id, NuevoPrecioRequest nuevoImporte, UserEntity user) {
@@ -123,17 +149,6 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         nuevoPrecio.setFechaVariacionImporte(nuevoImporte.getFechaVariacionImporte());
         nuevoPrecio.setImporte(nuevoImporte.getImporte());
         return precioRepository.save(nuevoPrecio);
-    }
-
-    public GastoRecurrenteEntity registrarPago(Long id, UserEntity user) {
-        GastoRecurrenteEntity gastoRecurrente = getGastoRecurrente(id, user);
-        LocalDate pagado = gastoRecurrente.getFechaProximoPago();
-        if (pagado == null) {
-            throw new IllegalStateException("No se puede registrar el pago: falta fecha de primer pago o frecuencia");
-        }
-        // El pago que estaba pendiente pasa a ser el último; el próximo avanza solo.
-        gastoRecurrente.setFechaUltimoPago(pagado);
-        return repository.save(gastoRecurrente);
     }
 
     public void remove(Long id, UserEntity user) {
