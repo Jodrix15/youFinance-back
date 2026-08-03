@@ -66,12 +66,6 @@ public class GastoRecurrenteController {
         return ResponseEntity.ok(GastoRecurrenteResponse.from(service.update(id, gastoRecurrente, user)));
     }
 
-    @PostMapping("/{id}/pago")
-    public ResponseEntity<GastoRecurrenteResponse> registrarPago(@PathVariable Long id,
-                                                                @AuthenticationPrincipal UserEntity user) {
-        return ResponseEntity.ok(GastoRecurrenteResponse.from(service.registrarPago(id, user)));
-    }
-
     @PatchMapping("/{id}/precio")
     public ResponseEntity<RecurrentePrecioResponse> registrarNuevoPrecio(@PathVariable Long id,
                                                                          @Valid @RequestBody NuevoPrecioRequest request,

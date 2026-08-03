@@ -27,7 +27,5 @@ public interface GastoRecurrenteService {
 
     RecurrentePrecioEntity registrarNuevoPrecio(Long id, NuevoPrecioRequest nuevoImporte, UserEntity user);
 
-    GastoRecurrenteEntity registrarPago(Long id, UserEntity user);
-
     void remove(Long id, UserEntity user);
 }
