@@ -22,8 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
 
@@ -53,27 +53,57 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
 
         long activos = items.stream().filter(GastoRecurrenteEntity::isActive).count();
 
-        BigDecimal gastoMensual = items.stream()
-                .filter(GastoRecurrenteEntity::isActive)
-                .map(GastoRecurrenteServiceImpl::costeMensual)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal gastoAnual = gastoMensual.multiply(BigDecimal.valueOf(12));
+        // gastoMensual = lo que se cobra REALMENTE en el mes en curso (no un promedio):
+        // los mensuales cuentan siempre y los anuales solo en su mes de cargo.
+        // gastoAnual = coste real de un año completo a este ritmo.
+        YearMonth mesActual = YearMonth.now();
+        BigDecimal gastoMensual = BigDecimal.ZERO;
+        BigDecimal gastoAnual = BigDecimal.ZERO;
+        for (GastoRecurrenteEntity gasto : items) {
+            if (!gasto.isActive()) {
+                continue;
+            }
+            BigDecimal importe = importeVigente(gasto);
+            if (importe.signum() == 0) {
+                continue;
+            }
+            gastoAnual = gastoAnual.add(gasto.getFrecuencia() == FrecuenciaEnum.ANUAL
+                    ? importe
+                    : importe.multiply(BigDecimal.valueOf(12)));
+            gastoMensual = gastoMensual.add(cargoEnMes(gasto, importe, mesActual));
+        }
 
         return new ResumenRecurrenteResponse(gastoMensual, gastoAnual, activos, items.size());
     }
 
-    /** Coste mensual normalizado del gasto (anual → ÷12), usando el importe actual. */
-    private static BigDecimal costeMensual(GastoRecurrenteEntity gasto) {
+    /** Importe actual del gasto (último precio del historial). */
+    private static BigDecimal importeVigente(GastoRecurrenteEntity gasto) {
         BigDecimal importe = gasto.getHistorial().stream()
                 .max(Comparator.comparing(RecurrentePrecioEntity::getId))
                 .map(RecurrentePrecioEntity::getImporte)
                 .orElse(BigDecimal.ZERO);
-        if (importe == null) {
-            importe = BigDecimal.ZERO;
+        return importe == null ? BigDecimal.ZERO : importe;
+    }
+
+    /**
+     * Importe que el gasto carga realmente en el mes dado. Mismo criterio que el
+     * widget de gastos fijos del dashboard: nada antes del primer pago, los
+     * mensuales cada mes y los anuales solo en el mes ancla (el del primer pago,
+     * o el del próximo si no hay primero).
+     */
+    private static BigDecimal cargoEnMes(GastoRecurrenteEntity gasto, BigDecimal importe, YearMonth objetivo) {
+        LocalDate primerPago = gasto.getFechaPrimerPago();
+        if (primerPago != null && objetivo.isBefore(YearMonth.from(primerPago))) {
+            return BigDecimal.ZERO;
         }
-        return gasto.getFrecuencia() == FrecuenciaEnum.ANUAL
-                ? importe.divide(BigDecimal.valueOf(12), 4, RoundingMode.HALF_UP)
-                : importe;
+        if (gasto.getFrecuencia() == FrecuenciaEnum.MENSUAL) {
+            return importe;
+        }
+        LocalDate ancla = primerPago != null ? primerPago : gasto.getFechaProximoPago();
+        if (ancla == null) {
+            return BigDecimal.ZERO;
+        }
+        return objetivo.getMonthValue() == ancla.getMonthValue() ? importe : BigDecimal.ZERO;
     }
 
     public RecurrentePrecioEntity getImporteActual(Long id, UserEntity user) {

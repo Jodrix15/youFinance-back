@@ -33,7 +33,7 @@ public interface DashboardService {
     List<FlujoCajaMesResponse> getFlujoCaja(UserEntity user, int anio);
 
     /** Total gastado por categoría, de mayor a menor. */
-    List<GastoCategoriaResponse> getGastosPorCategoria(UserEntity user);
+    List<GastoCategoriaResponse> getGastosPorCategoria(UserEntity user, Integer anio, Integer mes);
 
     /**
      * Gasto fijo que vence en el mes indicado: suscripciones y recurrentes

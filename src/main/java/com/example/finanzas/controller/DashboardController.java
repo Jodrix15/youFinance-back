@@ -80,9 +80,13 @@ public class DashboardController {
     }
 
     /** Total gastado por categoría, de mayor a menor. */
+    /** Gasto por categoría del periodo. Sin año ni mes, devuelve el total histórico. */
     @GetMapping("/gastos-categoria")
-    public ResponseEntity<List<GastoCategoriaResponse>> getGastosPorCategoria(@AuthenticationPrincipal UserEntity user) {
-        return ResponseEntity.ok(dashboardService.getGastosPorCategoria(user));
+    public ResponseEntity<List<GastoCategoriaResponse>> getGastosPorCategoria(
+            @RequestParam(required = false) Integer anio,
+            @RequestParam(required = false) Integer mes,
+            @AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(dashboardService.getGastosPorCategoria(user, anio, mes));
     }
 
     /** Gasto fijo que vence en el mes indicado (por defecto, el actual). */
