@@ -144,8 +144,8 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     @Override
-    public List<GastoCategoriaResponse> getGastosPorCategoria(UserEntity user) {
-        return transaccionRepository.gastosPorCategoria(user.getId()).stream()
+    public List<GastoCategoriaResponse> getGastosPorCategoria(UserEntity user, Integer anio, Integer mes) {
+        return transaccionRepository.gastosPorCategoria(user.getId(), anio, mes).stream()
                 .map(fila -> new GastoCategoriaResponse(
                         (String) fila[0],
                         (String) fila[1],
