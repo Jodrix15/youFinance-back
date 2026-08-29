@@ -99,13 +99,21 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
             "group by month(t.fechaTransaccion), t.tipoMovimiento")
     List<Object[]> totalesPorMesYTipo(@Param("userId") UUID userId, @Param("anio") Integer anio);
 
-    /** Total de gastos por categoría, con su color (widget de gastos por categoría). */
+    /**
+     * Total de gastos por categoría, con su color (widget de gastos por categoría).
+     * Año y mes son opcionales: a null no filtran, así que sirven para el total
+     * histórico y para un periodo concreto.
+     */
     @Query("select coalesce(c.nombreCategoria, 'Otros'), c.color, coalesce(sum(abs(t.importe)), 0) " +
             "from TransaccionEntity t left join t.categoria c " +
             "where t.user.id = :userId and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.GASTO " +
+            "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
+            "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
             "group by c.nombreCategoria, c.color " +
             "order by sum(abs(t.importe)) desc")
-    List<Object[]> gastosPorCategoria(@Param("userId") UUID userId);
+    List<Object[]> gastosPorCategoria(@Param("userId") UUID userId,
+                                      @Param("anio") Integer anio,
+                                      @Param("mes") Integer mes);
 
     /**
      * Total de ingresos agrupados por familia (origenIngreso) de la categoría.
