@@ -158,7 +158,13 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
 
         RecurrentePrecioEntity recurrentePrecio = new RecurrentePrecioEntity();
         recurrentePrecio.setGastoRecurrente(guardado);
-        recurrentePrecio.setFechaVariacionImporte(LocalDate.now());
+        // El precio del alta no puede ser anterior al primer pago: si el gasto
+        // empieza el mes que viene, su primer importe es de ese mes, no de hoy
+        // (si no, en los variables caería en el mes actual). Si el primer pago
+        // ya pasó, el importe indicado es el de ahora.
+        LocalDate hoy = LocalDate.now();
+        LocalDate primerPago = gastoRecurrenteDTO.fechaPrimerPago();
+        recurrentePrecio.setFechaVariacionImporte(primerPago.isAfter(hoy) ? primerPago : hoy);
         recurrentePrecio.setImporte(gastoRecurrenteDTO.importeInicial());
         precioRepository.save(recurrentePrecio);
 
