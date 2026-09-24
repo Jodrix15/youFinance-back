@@ -38,8 +38,7 @@ public record GastoRecurrenteResponse(
                 .map(RecurrentePrecioResponse::from)
                 .toList();
 
-        BigDecimal importeActual = precios.stream()
-                .max(Comparator.comparing(RecurrentePrecioEntity::getId))
+        BigDecimal importeActual = gasto.getPrecioVigente()
                 .map(RecurrentePrecioEntity::getImporte)
                 .orElse(null);
 

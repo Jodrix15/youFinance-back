@@ -56,7 +56,8 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
 
         // gastoMensual = lo que se cobra REALMENTE en el mes en curso (no un promedio):
         // los mensuales cuentan siempre y los anuales solo en su mes de cargo.
-        // gastoAnual = coste real de un año completo a este ritmo.
+        // gastoAnual = suma de los 12 meses del año en curso, cada uno con su importe
+        // (ver importeAnual).
         YearMonth mesActual = YearMonth.now();
         BigDecimal gastoMensualFijo = BigDecimal.ZERO;
         BigDecimal gastoMensualVariable = BigDecimal.ZERO;
@@ -65,13 +66,12 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
             if (!gasto.isActive()) {
                 continue;
             }
-            BigDecimal importe = importeVigente(gasto);
-            if (importe.signum() == 0) {
+            gastoAnual = gastoAnual.add(importeAnual(gasto, mesActual.getYear()));
+
+            BigDecimal importe = gasto.getImporteEnMes(mesActual);
+            if (importe == null || importe.signum() == 0) {
                 continue;
             }
-            gastoAnual = gastoAnual.add(gasto.getFrecuencia() == FrecuenciaEnum.ANUAL
-                    ? importe
-                    : importe.multiply(BigDecimal.valueOf(12)));
             BigDecimal cargo = cargoEnMes(gasto, importe, mesActual);
             if (gasto.getTipoImporte() == TipoImporteEnum.VARIABLE) {
                 gastoMensualVariable = gastoMensualVariable.add(cargo);
@@ -89,13 +89,26 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
                 items.size());
     }
 
-    /** Importe actual del gasto (último precio del historial). */
-    private static BigDecimal importeVigente(GastoRecurrenteEntity gasto) {
-        BigDecimal importe = gasto.getHistorial().stream()
-                .max(Comparator.comparing(RecurrentePrecioEntity::getId))
-                .map(RecurrentePrecioEntity::getImporte)
-                .orElse(BigDecimal.ZERO);
-        return importe == null ? BigDecimal.ZERO : importe;
+    /**
+     * Lo que el gasto carga en los 12 meses del año dado, mes a mes:
+     * - Fijos: el precio en vigor el día de cobro de cada mes (un cambio hecho
+     *   después del cobro empieza a contar el mes siguiente).
+     * - Variables: solo el importe apuntado para ESE mes; un mes sin importe
+     *   cuenta 0 (no se arrastra el del mes anterior).
+     * En ambos casos se respeta cargoEnMes: nada antes del primer pago y los
+     * anuales solo en su mes de cargo.
+     */
+    private static BigDecimal importeAnual(GastoRecurrenteEntity gasto, int anio) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (int m = 1; m <= 12; m++) {
+            YearMonth mes = YearMonth.of(anio, m);
+            BigDecimal importe = gasto.getImporteEnMes(mes);
+            if (importe == null || importe.signum() == 0) {
+                continue;
+            }
+            total = total.add(cargoEnMes(gasto, importe, mes));
+        }
+        return total;
     }
 
     /**
@@ -165,6 +178,25 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         if (datosActualizados.tipoImporte() != null) {
             existente.setTipoImporte(datosActualizados.tipoImporte());
         }
+        // Corrección del precio del alta: se sobrescribe el primer precio del
+        // historial en lugar de registrar un cambio (no hubo tal cambio, fue un error).
+        if (datosActualizados.importeInicial() != null) {
+            existente.getHistorial().stream()
+                    .min(Comparator.comparing(RecurrentePrecioEntity::getFechaVariacionImporte,
+                                    Comparator.nullsFirst(Comparator.naturalOrder()))
+                            .thenComparing(RecurrentePrecioEntity::getId))
+                    .ifPresentOrElse(
+                            p -> p.setImporte(datosActualizados.importeInicial()),
+                            () -> {
+                                RecurrentePrecioEntity inicial = new RecurrentePrecioEntity();
+                                inicial.setGastoRecurrente(existente);
+                                inicial.setFechaVariacionImporte(existente.getFechaPrimerPago() != null
+                                        ? existente.getFechaPrimerPago()
+                                        : LocalDate.now());
+                                inicial.setImporte(datosActualizados.importeInicial());
+                                existente.getHistorial().add(inicial);
+                            });
+        }
         existente.setActive(quedaActivo);
 
         // El ciclo de vida lo lleva el servidor, no el formulario. Dar de baja
@@ -191,13 +223,36 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         return periodo;
     }
 
+    /**
+     * Registra un importe.
+     * - Variables: como mucho uno por mes. Si ese mes ya tenía importe, se
+     *   sustituye (corregir el recibo de marzo no duplica marzo).
+     * - Fijos: es un cambio de precio con su fecha. Solo se sustituye si ya hay
+     *   un cambio en ese mismo día (para corregir un error); si no, se añade,
+     *   porque dos cambios en el mismo mes son legítimos y el cálculo mira el
+     *   día de cobro.
+     */
+    @Transactional
     public RecurrentePrecioEntity registrarNuevoPrecio(Long id, NuevoPrecioRequest nuevoImporte, UserEntity user) {
         GastoRecurrenteEntity gastoRecurrente = getGastoRecurrente(id, user);
-        RecurrentePrecioEntity nuevoPrecio = new RecurrentePrecioEntity();
-        nuevoPrecio.setGastoRecurrente(gastoRecurrente);
-        nuevoPrecio.setFechaVariacionImporte(nuevoImporte.getFechaVariacionImporte());
-        nuevoPrecio.setImporte(nuevoImporte.getImporte());
-        return precioRepository.save(nuevoPrecio);
+        LocalDate fecha = nuevoImporte.getFechaVariacionImporte();
+        YearMonth mes = YearMonth.from(fecha);
+
+        boolean variable = gastoRecurrente.getTipoImporte() == TipoImporteEnum.VARIABLE;
+        RecurrentePrecioEntity precio = gastoRecurrente.getHistorial().stream()
+                .filter(p -> p.getFechaVariacionImporte() != null
+                        && (variable
+                            ? YearMonth.from(p.getFechaVariacionImporte()).equals(mes)
+                            : p.getFechaVariacionImporte().equals(fecha)))
+                .max(Comparator.comparing(RecurrentePrecioEntity::getId))
+                .orElseGet(() -> {
+                    RecurrentePrecioEntity nuevo = new RecurrentePrecioEntity();
+                    nuevo.setGastoRecurrente(gastoRecurrente);
+                    return nuevo;
+                });
+        precio.setFechaVariacionImporte(fecha);
+        precio.setImporte(nuevoImporte.getImporte());
+        return precioRepository.save(precio);
     }
 
     public void remove(Long id, UserEntity user) {

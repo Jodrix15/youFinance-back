@@ -186,10 +186,8 @@ public class DashboardServiceImpl implements DashboardService {
         if (!gasto.isActive()) {
             return BigDecimal.ZERO;
         }
-        BigDecimal importe = gasto.getHistorial().stream()
-                .max(Comparator.comparing(RecurrentePrecioEntity::getId))
-                .map(RecurrentePrecioEntity::getImporte)
-                .orElse(BigDecimal.ZERO);
+        // El importe de ESE mes, no el de hoy (fijos: el del día de cobro; variables: el apuntado).
+        BigDecimal importe = gasto.getImporteEnMes(objetivo);
         if (importe.signum() == 0) {
             return BigDecimal.ZERO;
         }
