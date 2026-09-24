@@ -1,6 +1,7 @@
 package com.example.finanzas.dto.gasto;
 
 import com.example.finanzas.model.enums.FrecuenciaEnum;
+import com.example.finanzas.model.enums.TipoImporteEnum;
 import com.example.finanzas.model.enums.TipoPagoEnum;
 import com.example.finanzas.model.Gastos.GastoRecurrenteEntity;
 import com.example.finanzas.model.Gastos.RecurrentePrecioEntity;
@@ -17,6 +18,7 @@ public record GastoRecurrenteResponse(
         String categoriaNombre,
         TipoPagoEnum tipoPago,
         FrecuenciaEnum frecuencia,
+        TipoImporteEnum tipoImporte,
         LocalDate fechaPrimerPago,
         LocalDate fechaUltimoPago,
         LocalDate fechaProximoPago,
@@ -48,6 +50,7 @@ public record GastoRecurrenteResponse(
                 gasto.getCategoria() != null ? gasto.getCategoria().getNombreCategoria() : null,
                 gasto.getTipoPago(),
                 gasto.getFrecuencia(),
+                gasto.getTipoImporte(),
                 gasto.getFechaPrimerPago(),
                 gasto.getFechaUltimoPago(),
                 gasto.getFechaProximoPago(),
