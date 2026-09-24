@@ -2,6 +2,7 @@ package com.example.finanzas.model.Gastos;
 
 import com.example.finanzas.model.CategoriaEntity;
 import com.example.finanzas.model.enums.FrecuenciaEnum;
+import com.example.finanzas.model.enums.TipoImporteEnum;
 import com.example.finanzas.model.enums.TipoPagoEnum;
 import com.example.finanzas.model.UserEntity;
 import jakarta.persistence.*;
@@ -51,6 +52,11 @@ public class GastoRecurrenteEntity {
 
     @Enumerated(EnumType.STRING)
     private FrecuenciaEnum frecuencia;
+
+    /** Fijo (siempre el mismo importe) o variable (luz, agua...). Solo clasifica. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_importe", nullable = false)
+    private TipoImporteEnum tipoImporte = TipoImporteEnum.FIJO;
 
     @OneToMany(mappedBy = "gastoRecurrente", cascade = CascadeType.ALL, orphanRemoval = true,
             fetch = FetchType.EAGER)

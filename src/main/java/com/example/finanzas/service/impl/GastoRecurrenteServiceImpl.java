@@ -8,6 +8,7 @@ import com.example.finanzas.dto.gasto.ResumenRecurrenteResponse;
 import com.example.finanzas.model.CategoriaEntity;
 import com.example.finanzas.model.UserEntity;
 import com.example.finanzas.model.enums.FrecuenciaEnum;
+import com.example.finanzas.model.enums.TipoImporteEnum;
 import com.example.finanzas.model.enums.TipoPagoEnum;
 import com.example.finanzas.model.Gastos.GastoRecurrenteEntity;
 import com.example.finanzas.model.Gastos.RecurrentePeriodoEntity;
@@ -57,7 +58,8 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         // los mensuales cuentan siempre y los anuales solo en su mes de cargo.
         // gastoAnual = coste real de un año completo a este ritmo.
         YearMonth mesActual = YearMonth.now();
-        BigDecimal gastoMensual = BigDecimal.ZERO;
+        BigDecimal gastoMensualFijo = BigDecimal.ZERO;
+        BigDecimal gastoMensualVariable = BigDecimal.ZERO;
         BigDecimal gastoAnual = BigDecimal.ZERO;
         for (GastoRecurrenteEntity gasto : items) {
             if (!gasto.isActive()) {
@@ -70,10 +72,21 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
             gastoAnual = gastoAnual.add(gasto.getFrecuencia() == FrecuenciaEnum.ANUAL
                     ? importe
                     : importe.multiply(BigDecimal.valueOf(12)));
-            gastoMensual = gastoMensual.add(cargoEnMes(gasto, importe, mesActual));
+            BigDecimal cargo = cargoEnMes(gasto, importe, mesActual);
+            if (gasto.getTipoImporte() == TipoImporteEnum.VARIABLE) {
+                gastoMensualVariable = gastoMensualVariable.add(cargo);
+            } else {
+                gastoMensualFijo = gastoMensualFijo.add(cargo);
+            }
         }
 
-        return new ResumenRecurrenteResponse(gastoMensual, gastoAnual, activos, items.size());
+        return new ResumenRecurrenteResponse(
+                gastoMensualFijo.add(gastoMensualVariable),
+                gastoMensualFijo,
+                gastoMensualVariable,
+                gastoAnual,
+                activos,
+                items.size());
     }
 
     /** Importe actual del gasto (último precio del historial). */
@@ -120,6 +133,9 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         gastoRecurrente.setNombre(gastoRecurrenteDTO.nombre());
         gastoRecurrente.setFrecuencia(gastoRecurrenteDTO.frecuencia());
         gastoRecurrente.setTipoPago(gastoRecurrenteDTO.tipoPago());
+        gastoRecurrente.setTipoImporte(gastoRecurrenteDTO.tipoImporte() != null
+                ? gastoRecurrenteDTO.tipoImporte()
+                : TipoImporteEnum.FIJO);
         // Nace activo, con su primer periodo abierto desde la fecha de primer pago.
         gastoRecurrente.setActive(true);
         gastoRecurrente.getPeriodos()
@@ -146,6 +162,9 @@ public class GastoRecurrenteServiceImpl implements GastoRecurrenteService {
         existente.setCategoria(resolverCategoria(datosActualizados.categoriaId(), user));
         existente.setTipoPago(datosActualizados.tipoPago());
         existente.setFrecuencia(datosActualizados.frecuencia());
+        if (datosActualizados.tipoImporte() != null) {
+            existente.setTipoImporte(datosActualizados.tipoImporte());
+        }
         existente.setActive(quedaActivo);
 
         // El ciclo de vida lo lleva el servidor, no el formulario. Dar de baja
