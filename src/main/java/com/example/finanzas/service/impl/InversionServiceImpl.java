@@ -6,6 +6,7 @@ import com.example.finanzas.dto.inversion.CuentaInversionResponse;
 import com.example.finanzas.dto.inversion.DistribucionCategoriaResponse;
 import com.example.finanzas.dto.inversion.InversionDTO;
 import com.example.finanzas.dto.inversion.RendimientoMesResponse;
+import com.example.finanzas.dto.inversion.RepartirInversionDTO;
 import com.example.finanzas.dto.inversion.ResumenInversionResponse;
 import com.example.finanzas.dto.inversion.RetiradaDTO;
 import com.example.finanzas.model.CategoriaEntity;
@@ -128,6 +129,132 @@ public class InversionServiceImpl implements InversionService {
         InversionEntity inversion = getInversionById(id, user);
         inversion.setCuenta(cuentaId != null ? cargarCuentaInversion(cuentaId, user) : null);
         return repository.save(inversion);
+    }
+
+    /**
+     * Reparte la posición entre cuentas y/o activos (p. ej. "Acciones" que en
+     * realidad son Apple en un broker y Microsoft en otro). Cada tramo se lleva
+     * su parte del valor actual, la parte proporcional del aportado y,
+     * opcionalmente, su propio activo. Si en la cuenta destino ya existe ese
+     * activo (misma categoría), la parte se suma a esa posición en vez de crear
+     * otra. Si se reparte todo, la original pasa a ser el último tramo (o se
+     * borra si todo se sumó a posiciones existentes); si no, se queda con el
+     * resto en su cuenta y activo actuales. No mueve efectivo.
+     */
+    @Transactional
+    public List<InversionEntity> repartir(Long id, RepartirInversionDTO dto, UserEntity user) {
+        InversionEntity original = getInversionById(id, user);
+        BigDecimal total = original.getCapitalTotal();
+        BigDecimal aportado = original.getCapitalAportado();
+        if (total == null || total.signum() <= 0) {
+            throw new IllegalArgumentException("Solo se puede repartir una posición con valor mayor que cero");
+        }
+
+        List<RepartirInversionDTO.Tramo> tramos = dto.tramos();
+        Map<Long, CuentaEntity> cargadas = new HashMap<>();
+        BigDecimal suma = BigDecimal.ZERO;
+        List<CuentaEntity> cuentas = new ArrayList<>();
+        for (RepartirInversionDTO.Tramo tramo : tramos) {
+            cuentas.add(cargadas.computeIfAbsent(tramo.cuentaId(), cid -> cargarCuentaInversion(cid, user)));
+            suma = suma.add(tramo.importe());
+        }
+        if (suma.compareTo(total) > 0) {
+            throw new IllegalArgumentException("El reparto (" + suma.setScale(2, RoundingMode.HALF_UP)
+                    + ") supera el valor de la posición (" + total.setScale(2, RoundingMode.HALF_UP) + ")");
+        }
+
+        boolean completo = suma.compareTo(total) == 0;
+        BigDecimal restoTotal = total;
+        BigDecimal restoAportado = aportado;
+        List<InversionEntity> resultado = new ArrayList<>();
+        boolean originalMovida = false;
+        // Partes que coinciden con la propia original (misma cuenta y activo): se quedan en ella.
+        BigDecimal quedaTotal = BigDecimal.ZERO;
+        BigDecimal quedaAportado = BigDecimal.ZERO;
+
+        // Posiciones de la misma categoría a las que se puede traspasar: si ya
+        // existe ese activo en esa cuenta, la parte se suma a ella (sin duplicar).
+        List<InversionEntity> destinos = getAllInversiones(user).stream()
+                .filter(i -> !i.getId().equals(original.getId()))
+                .filter(i -> i.getCategoria().getId().equals(original.getCategoria().getId()))
+                .filter(i -> i.getCuenta() != null)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        for (int i = 0; i < tramos.size(); i++) {
+            RepartirInversionDTO.Tramo tramo = tramos.get(i);
+            CuentaEntity cuenta = cuentas.get(i);
+            String nombre = nombreTramo(tramo, original);
+            boolean ultimoCompleto = completo && i == tramos.size() - 1;
+
+            // La última parte de un reparto completo se lleva el resto exacto (sin redondeos).
+            BigDecimal importe = ultimoCompleto ? restoTotal : tramo.importe();
+            BigDecimal aportadoTramo = ultimoCompleto ? restoAportado.max(BigDecimal.ZERO)
+                    : aportado.multiply(importe).divide(total, 2, RoundingMode.HALF_UP)
+                            .min(restoAportado.max(BigDecimal.ZERO));
+
+            // Mismo activo y misma cuenta que la original: esa parte simplemente se queda.
+            boolean mismaCuenta = original.getCuenta() != null
+                    && original.getCuenta().getId().equals(cuenta.getId());
+            if (mismaCuenta && claveActivo(nombre, original).equals(claveActivo(original.getNombre(), original))) {
+                quedaTotal = quedaTotal.add(importe);
+                quedaAportado = quedaAportado.add(aportadoTramo);
+                restoTotal = restoTotal.subtract(importe);
+                restoAportado = restoAportado.subtract(aportadoTramo);
+                continue;
+            }
+
+            InversionEntity destino = destinos.stream()
+                    .filter(d -> d.getCuenta().getId().equals(cuenta.getId()))
+                    .filter(d -> claveActivo(d.getNombre(), d).equals(claveActivo(nombre, original)))
+                    .findFirst()
+                    .orElse(null);
+
+            if (destino != null) {
+                destino.setCapitalTotal(destino.getCapitalTotal().add(importe));
+                destino.setCapitalAportado(destino.getCapitalAportado().add(aportadoTramo));
+                resultado.add(repository.save(destino));
+            } else if (ultimoCompleto && quedaTotal.signum() == 0) {
+                // La original pasa a ser esta parte (conserva su id).
+                original.setCuenta(cuenta);
+                original.setNombre(nombre);
+                originalMovida = true;
+                break;
+            } else {
+                InversionEntity parte = new InversionEntity();
+                parte.setUser(user);
+                parte.setCategoria(original.getCategoria());
+                parte.setNombre(nombre);
+                parte.setCuenta(cuenta);
+                parte.setCapitalTotal(importe);
+                parte.setCapitalAportado(aportadoTramo);
+                InversionEntity guardada = repository.save(parte);
+                destinos.add(guardada);
+                resultado.add(guardada);
+            }
+            restoTotal = restoTotal.subtract(importe);
+            restoAportado = restoAportado.subtract(aportadoTramo);
+        }
+
+        restoTotal = restoTotal.add(quedaTotal);
+        restoAportado = restoAportado.add(quedaAportado);
+        if (!originalMovida && restoTotal.signum() == 0) {
+            // Todo se ha sumado a posiciones existentes: la original queda vacía.
+            repository.delete(original);
+            return resultado;
+        }
+        original.setCapitalTotal(restoTotal);
+        original.setCapitalAportado(restoAportado.max(BigDecimal.ZERO));
+        resultado.add(repository.save(original));
+        return resultado;
+    }
+
+    /** Clave para comparar activos: su nombre o, sin él, el de la categoría (sin mayúsculas). */
+    private static String claveActivo(String nombre, InversionEntity ref) {
+        String n = limpiarNombre(nombre);
+        if (n == null) {
+            n = ref.getCategoria() != null ? ref.getCategoria().getNombreCategoria() : "";
+        }
+        return n.trim().toLowerCase();
     }
 
     /**
@@ -371,6 +498,12 @@ public class InversionServiceImpl implements InversionService {
         apunte.setDescripcion(descripcion);
         apunte.setFechaTransaccion(fecha);
         transaccionRepository.save(apunte);
+    }
+
+    /** Activo de un tramo del reparto: el indicado o, si viene vacío, el de la original. */
+    private static String nombreTramo(RepartirInversionDTO.Tramo tramo, InversionEntity original) {
+        String nombre = limpiarNombre(tramo.nombre());
+        return nombre != null ? nombre : original.getNombre();
     }
 
     private static String limpiarNombre(String nombre) {
