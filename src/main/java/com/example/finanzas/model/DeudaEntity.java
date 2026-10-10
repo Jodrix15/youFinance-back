@@ -44,6 +44,8 @@ public class DeudaEntity {
 
     private BigDecimal cuota = BigDecimal.ZERO;
 
+    private LocalDate fechaInicio;
+
     private LocalDate fechaVencimiento;
 
     // Valores derivados: se calculan a partir de importe/interes/cantidadPagada, no se persisten

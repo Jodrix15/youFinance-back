@@ -49,6 +49,17 @@ public class DeudaServiceImpl implements DeudaService {
         return importe;
     }
 
+    public BigDecimal getPendienteTotal(UserEntity user) {
+        BigDecimal pendiente = BigDecimal.ZERO;
+        for (DeudaEntity deuda : getAllDeudas(user)) {
+            BigDecimal p = deuda.getCantidadPendiente();
+            if (p != null) {
+                pendiente = pendiente.add(p);
+            }
+        }
+        return pendiente;
+    }
+
     public ResumenDeudaResponse getResumen(UserEntity user) {
         List<DeudaEntity> deudas = getAllDeudas(user);
         BigDecimal totalPendiente = BigDecimal.ZERO;
@@ -109,6 +120,7 @@ public class DeudaServiceImpl implements DeudaService {
         deuda.setInteres(deudaDTO.interes());
         deuda.setFrecuencia(deudaDTO.frecuencia());
         deuda.setCuota(deudaDTO.cuota());
+        deuda.setFechaInicio(deudaDTO.fechaInicio());
         deuda.setFechaVencimiento(deudaDTO.fechaVencimiento());
     }
 

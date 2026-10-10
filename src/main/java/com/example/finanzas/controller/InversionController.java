@@ -1,6 +1,10 @@
 package com.example.finanzas.controller;
 
 import com.example.finanzas.dto.inversion.ActualizarInversionDTO;
+import com.example.finanzas.dto.inversion.AsignarCuentaDTO;
+import com.example.finanzas.dto.inversion.CuentaInversionResponse;
+import com.example.finanzas.dto.inversion.RendimientoMesResponse;
+import com.example.finanzas.dto.inversion.RetiradaDTO;
 import com.example.finanzas.dto.inversion.DistribucionCategoriaResponse;
 import com.example.finanzas.dto.inversion.InversionDTO;
 import com.example.finanzas.dto.inversion.InversionResponse;
@@ -65,6 +69,40 @@ public class InversionController {
     public ResponseEntity<Void> remove(@PathVariable Long id,
                                        @AuthenticationPrincipal UserEntity user) {
         inversionService.remove(id, user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/cuenta")
+    public ResponseEntity<InversionResponse> asignarCuenta(@PathVariable Long id,
+                                                           @RequestBody AsignarCuentaDTO dto,
+                                                           @AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(InversionResponse.from(inversionService.asignarCuenta(id, dto.cuentaId(), user)));
+    }
+
+    // ── Cuentas de inversión ────────────────────────────────────────────────
+
+    @GetMapping("/cuentas")
+    public ResponseEntity<List<CuentaInversionResponse>> getCuentas(@AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(inversionService.getCuentasInversion(user));
+    }
+
+    @GetMapping("/cuentas/{cuentaId}")
+    public ResponseEntity<CuentaInversionResponse> getCuenta(@PathVariable Long cuentaId,
+                                                             @AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(inversionService.getCuentaInversion(cuentaId, user));
+    }
+
+    @GetMapping("/cuentas/{cuentaId}/rendimientos")
+    public ResponseEntity<List<RendimientoMesResponse>> getRendimientos(@PathVariable Long cuentaId,
+                                                                        @AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(inversionService.getRendimientosMensuales(cuentaId, user));
+    }
+
+    @PostMapping("/cuentas/{cuentaId}/retirada")
+    public ResponseEntity<Void> retirar(@PathVariable Long cuentaId,
+                                        @Valid @RequestBody RetiradaDTO dto,
+                                        @AuthenticationPrincipal UserEntity user) {
+        inversionService.retirar(cuentaId, dto, user);
         return ResponseEntity.noContent().build();
     }
 }

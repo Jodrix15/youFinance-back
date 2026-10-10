@@ -17,6 +17,7 @@ public record DeudaDTOResponse(
     BigDecimal cuota,
     FrecuenciaEnum frecuencia,
     BigDecimal interes,
+    LocalDate fechaInicio,
     LocalDate fechaVencimiento
 ) {
     public static DeudaDTOResponse from(DeudaEntity deuda) {
@@ -31,6 +32,7 @@ public record DeudaDTOResponse(
                 deuda.getCuota(),
                 deuda.getFrecuencia(),
                 deuda.getInteres(),
+                deuda.getFechaInicio(),
                 deuda.getFechaVencimiento()
         );
     }
