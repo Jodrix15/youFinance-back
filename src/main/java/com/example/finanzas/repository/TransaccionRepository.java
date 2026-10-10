@@ -117,25 +117,17 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
                                       @Param("mes") Integer mes);
 
     /**
-     * Familia efectiva de un ingreso: si entra en una cuenta de inversión cuenta
-     * siempre como INVERSION (intereses, dividendos…), sea cual sea la categoría;
-     * si no, la familia de su categoría.
-     */
-    String FAMILIA_INGRESO = "case when t.cuenta.tipo = com.example.finanzas.model.enums.TipoCuentaEnum.INVERSION "
-            + "then com.example.finanzas.model.enums.OrigenIngresoEnum.INVERSION else c.origenIngreso end";
-
-    /**
      * Total de ingresos agrupados por familia (origenIngreso) de la categoría.
      * Los ingresos se guardan con importe positivo. Filtra opcionalmente por año/mes.
      * La familia puede venir null en categorías de ingreso aún sin clasificar.
      */
-    @Query("select " + FAMILIA_INGRESO + ", coalesce(sum(t.importe), 0) " +
+    @Query("select c.origenIngreso, coalesce(sum(t.importe), 0) " +
             "from TransaccionEntity t join t.categoria c " +
             "where t.user.id = :userId " +
             "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
             "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
             "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
-            "group by " + FAMILIA_INGRESO)
+            "group by c.origenIngreso")
     List<Object[]> ingresosPorFamilia(@Param("userId") UUID userId,
                                       @Param("anio") Integer anio,
                                       @Param("mes") Integer mes);
@@ -146,22 +138,22 @@ public interface TransaccionRepository extends JpaRepository<TransaccionEntity, 
      * huecos se rellenan a cero en el servicio. La familia puede ser null:
      * categorías todavía sin clasificar.
      */
-    @Query("select year(t.fechaTransaccion), month(t.fechaTransaccion), " + FAMILIA_INGRESO + ", coalesce(sum(t.importe), 0) " +
+    @Query("select year(t.fechaTransaccion), month(t.fechaTransaccion), c.origenIngreso, coalesce(sum(t.importe), 0) " +
             "from TransaccionEntity t join t.categoria c " +
             "where t.user.id = :userId " +
             "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
-            "group by year(t.fechaTransaccion), month(t.fechaTransaccion), " + FAMILIA_INGRESO + " " +
+            "group by year(t.fechaTransaccion), month(t.fechaTransaccion), c.origenIngreso " +
             "order by year(t.fechaTransaccion), month(t.fechaTransaccion)")
     List<Object[]> ingresosPorMesYFamilia(@Param("userId") UUID userId);
 
     /** Total de ingresos por categoría (nombre + familia + color), de mayor a menor. */
-    @Query("select c.nombreCategoria, " + FAMILIA_INGRESO + ", c.color, coalesce(sum(t.importe), 0) " +
+    @Query("select c.nombreCategoria, c.origenIngreso, c.color, coalesce(sum(t.importe), 0) " +
             "from TransaccionEntity t join t.categoria c " +
             "where t.user.id = :userId " +
             "and t.tipoMovimiento = com.example.finanzas.model.enums.TipoMovimientoEnum.INGRESO " +
             "and (:anio is null or year(t.fechaTransaccion) = :anio) " +
             "and (:mes is null or month(t.fechaTransaccion) = :mes) " +
-            "group by c.nombreCategoria, " + FAMILIA_INGRESO + ", c.color " +
+            "group by c.nombreCategoria, c.origenIngreso, c.color " +
             "order by sum(t.importe) desc")
     List<Object[]> ingresosPorCategoria(@Param("userId") UUID userId,
                                         @Param("anio") Integer anio,
