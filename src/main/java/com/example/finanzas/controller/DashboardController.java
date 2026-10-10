@@ -62,7 +62,8 @@ public class DashboardController {
 
     @GetMapping("/capital-deuda")
     public ResponseEntity<BigDecimal> getCapitalDeudas(@AuthenticationPrincipal UserEntity user) {
-        return ResponseEntity.ok(deudaService.getImporteTotal(user));
+        // Deuda restante: lo que queda por pagar, no el total original con intereses.
+        return ResponseEntity.ok(deudaService.getPendienteTotal(user));
     }
 
     @GetMapping("/distribucion-patrimonio")
