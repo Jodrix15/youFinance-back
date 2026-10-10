@@ -19,6 +19,7 @@ public record DeudaDTO(
         @NotNull(message = "La cuota es obligatoria")
         @PositiveOrZero(message = "La cuota no puede ser negativa") BigDecimal cuota,
         @PositiveOrZero(message = "El interés no puede ser negativo") BigDecimal interes,
+        LocalDate fechaInicio,
         LocalDate fechaVencimiento
 ) {
     public DeudaDTO {
@@ -33,5 +34,13 @@ public record DeudaDTO(
             return true; // otras validaciones ya cubren los nulos
         }
         return cantidadPagada.compareTo(importe) <= 0;
+    }
+
+    @AssertTrue(message = "La fecha de inicio no puede ser posterior al vencimiento")
+    public boolean isFechasValidas() {
+        if (fechaInicio == null || fechaVencimiento == null) {
+            return true;
+        }
+        return !fechaInicio.isAfter(fechaVencimiento);
     }
 }

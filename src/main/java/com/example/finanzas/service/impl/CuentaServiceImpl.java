@@ -8,6 +8,8 @@ import com.example.finanzas.dto.cuenta.ResumenCuentaResponse;
 import com.example.finanzas.dto.cuenta.TransaccionDTO;
 import com.example.finanzas.repository.CategoriaRepository;
 import com.example.finanzas.repository.CuentaRepository;
+import com.example.finanzas.repository.InversionRepository;
+import com.example.finanzas.model.enums.TipoCuentaEnum;
 import com.example.finanzas.repository.TransaccionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class CuentaServiceImpl implements CuentaService {
     private final CuentaRepository repository;
     private final TransaccionRepository transaccionRepository;
     private final CategoriaRepository categoriaRepository;
+    private final InversionRepository inversionRepository;
 
     // ── Lectura ──────────────────────────────────────────────────────────────
 
@@ -55,7 +58,11 @@ public class CuentaServiceImpl implements CuentaService {
     }
 
     public ResumenCuentaResponse getResumen(UserEntity user, Integer anio, Integer mes) {
-        List<CuentaEntity> cuentas = getAllCuentas(user);
+        // La página de Cuentas solo muestra las corrientes: el efectivo de las
+        // cuentas de inversión se ve en Inversiones.
+        List<CuentaEntity> cuentas = getAllCuentas(user).stream()
+                .filter(c -> !c.esDeInversion())
+                .toList();
         BigDecimal totalCuentas = cuentas.stream()
                 .map(CuentaEntity::getSaldo)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -98,6 +105,8 @@ public class CuentaServiceImpl implements CuentaService {
         cuenta.setUser(user);
         cuenta.setNombreCuenta(cuentaDTO.nombreCuenta());
         cuenta.setSaldoInicial(cuentaDTO.saldoInicial());
+        cuenta.setTipo(cuentaDTO.tipo() != null ? cuentaDTO.tipo() : TipoCuentaEnum.CORRIENTE);
+        aplicarCamposInversion(cuenta, cuentaDTO, user);
         CuentaEntity guardada = repository.save(cuenta);
         guardada.hidratarSaldo(BigDecimal.ZERO);
         return guardada;
@@ -111,6 +120,16 @@ public class CuentaServiceImpl implements CuentaService {
         CuentaEntity cuenta = cargarCuenta(id, user);
         cuenta.setNombreCuenta(cuentaDTO.nombreCuenta());
         cuenta.setSaldoInicial(cuentaDTO.saldoInicial());
+        // Sin tipo en el DTO (formulario de cuentas corrientes) no se tocan ni
+        // el tipo ni los campos de inversión.
+        if (cuentaDTO.tipo() != null) {
+            if (cuentaDTO.tipo() != cuenta.getTipo() && inversionRepository.existsByCuentaId(id)) {
+                throw new IllegalStateException(
+                        "No se puede cambiar el tipo de una cuenta con inversiones asignadas.");
+            }
+            cuenta.setTipo(cuentaDTO.tipo());
+            aplicarCamposInversion(cuenta, cuentaDTO, user);
+        }
         CuentaEntity guardada = repository.save(cuenta);
         guardada.hidratarSaldo(transaccionRepository.sumaDeCuenta(id));
         return guardada;
@@ -126,6 +145,10 @@ public class CuentaServiceImpl implements CuentaService {
         if (transaccionRepository.existsByCuentaContrapartidaId(id)) {
             throw new IllegalStateException(
                     "No se puede eliminar una cuenta que interviene en transferencias. Elimina primero esos traspasos.");
+        }
+        if (inversionRepository.existsByCuentaId(id)) {
+            throw new IllegalStateException(
+                    "No se puede eliminar una cuenta de inversión con posiciones. Elimínalas o muévelas a otra cuenta.");
         }
         repository.delete(cuenta);
     }
@@ -258,6 +281,29 @@ public class CuentaServiceImpl implements CuentaService {
                 .orElseThrow(() -> new EntityNotFoundException("Cuenta no encontrada con id " + id));
         verificarPropiedad(cuenta, user);
         return cuenta;
+    }
+
+    /**
+     * Plataforma, color y cuenta vinculada. En una cuenta corriente la
+     * plataforma y la vinculada no tienen sentido y se limpian.
+     */
+    private void aplicarCamposInversion(CuentaEntity cuenta, CuentaDTO dto, UserEntity user) {
+        cuenta.setColor(dto.color());
+        if (!cuenta.esDeInversion()) {
+            cuenta.setPlataforma(null);
+            cuenta.setCuentaVinculada(null);
+            return;
+        }
+        cuenta.setPlataforma(dto.plataforma());
+        if (dto.cuentaVinculadaId() == null) {
+            cuenta.setCuentaVinculada(null);
+            return;
+        }
+        CuentaEntity vinculada = cargarCuenta(dto.cuentaVinculadaId(), user);
+        if (vinculada.esDeInversion()) {
+            throw new IllegalArgumentException("La cuenta vinculada debe ser una cuenta corriente");
+        }
+        cuenta.setCuentaVinculada(vinculada);
     }
 
     private void validarDTO(TransaccionDTO dto, Long cuentaOrigenId) {

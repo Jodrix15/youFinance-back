@@ -207,13 +207,17 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * Cuota que una deuda carga realmente en el mes dado. Mensual → cada mes
-     * hasta el vencimiento; anual → aproximada al mes del vencimiento (las
-     * deudas no tienen fecha de próximo pago).
+     * Cuota que una deuda carga realmente en el mes dado: solo entre la fecha de
+     * inicio (si la hay) y el vencimiento. Mensual → cada mes; anual → en el mes
+     * de la fecha de inicio, o del vencimiento si no hay inicio.
      */
     private BigDecimal importeDeudaEnMes(DeudaEntity deuda, YearMonth objetivo) {
         BigDecimal cuota = deuda.getCuota() != null ? deuda.getCuota() : BigDecimal.ZERO;
         if (cuota.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        LocalDate inicio = deuda.getFechaInicio();
+        if (inicio != null && objetivo.isBefore(YearMonth.from(inicio))) {
             return BigDecimal.ZERO;
         }
         LocalDate vencimiento = deuda.getFechaVencimiento();
@@ -223,9 +227,10 @@ public class DashboardServiceImpl implements DashboardService {
         if (deuda.getFrecuencia() == FrecuenciaEnum.MENSUAL) {
             return cuota;
         }
-        if (vencimiento == null) {
+        LocalDate ancla = inicio != null ? inicio : vencimiento;
+        if (ancla == null) {
             return BigDecimal.ZERO;
         }
-        return objetivo.getMonthValue() == vencimiento.getMonthValue() ? cuota : BigDecimal.ZERO;
+        return objetivo.getMonthValue() == ancla.getMonthValue() ? cuota : BigDecimal.ZERO;
     }
 }

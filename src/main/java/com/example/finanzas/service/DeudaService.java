@@ -20,6 +20,9 @@ public interface DeudaService {
 
     BigDecimal getImporteTotal(UserEntity user);
 
+    /** Suma de lo que queda por pagar (total con intereses - pagado) de todas las deudas. */
+    BigDecimal getPendienteTotal(UserEntity user);
+
     ResumenDeudaResponse getResumen(UserEntity user);
 
     void remove(Long id, UserEntity user);
