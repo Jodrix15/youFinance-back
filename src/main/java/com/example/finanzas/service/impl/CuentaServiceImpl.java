@@ -155,10 +155,18 @@ public class CuentaServiceImpl implements CuentaService {
 
     // ── Transacciones ────────────────────────────────────────────────────────
 
+    /** En una cuenta de inversión el dinero sale con aportaciones a posiciones o transferencias. */
+    private static final String SIN_GASTOS_EN_INVERSION =
+            "En una cuenta de inversión solo se registran ingresos y transferencias: "
+                    + "las aportaciones se hacen desde las posiciones.";
+
     @Transactional
     public TransaccionEntity addTransaccionToCuenta(Long cuentaId, TransaccionDTO transaccionDTO, UserEntity user) {
         CuentaEntity cuenta = cargarCuenta(cuentaId, user);
         validarDTO(transaccionDTO, cuentaId);
+        if (cuenta.esDeInversion() && transaccionDTO.tipoMovimiento() == TipoMovimientoEnum.GASTO) {
+            throw new IllegalArgumentException(SIN_GASTOS_EN_INVERSION);
+        }
 
         if (transaccionDTO.tipoMovimiento() == TipoMovimientoEnum.TRANSFERENCIA) {
             return crearTransferencia(cuenta, transaccionDTO, user);
@@ -175,6 +183,13 @@ public class CuentaServiceImpl implements CuentaService {
     public TransaccionEntity updateTransaccion(Long cuentaId, Long transaccionId, TransaccionDTO transaccionDTO, UserEntity user) {
         TransaccionEntity transaccion = getTransaccion(cuentaId, transaccionId, user);
         validarDTO(transaccionDTO, cuentaId);
+        // Los gastos que ya existían en cuentas de inversión se pueden seguir editando;
+        // lo que no se permite es convertir otro movimiento en gasto.
+        if (transaccion.getCuenta().esDeInversion()
+                && transaccionDTO.tipoMovimiento() == TipoMovimientoEnum.GASTO
+                && transaccion.getTipoMovimiento() != TipoMovimientoEnum.GASTO) {
+            throw new IllegalArgumentException(SIN_GASTOS_EN_INVERSION);
+        }
 
         boolean era = transaccion.esTransferencia();
         boolean sera = transaccionDTO.tipoMovimiento() == TipoMovimientoEnum.TRANSFERENCIA;
