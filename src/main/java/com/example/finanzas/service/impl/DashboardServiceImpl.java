@@ -48,7 +48,7 @@ public class DashboardServiceImpl implements DashboardService {
     public BigDecimal getPatrimonioNeto(UserEntity user) {
         return cuentaService.getImporteTotal(user)
                 .add(inversionService.getImporteTotal(user))
-                .subtract(deudaService.getImporteTotal(user));
+                .subtract(deudaService.getPendienteTotal(user));
     }
 
     @Override
@@ -88,7 +88,7 @@ public class DashboardServiceImpl implements DashboardService {
     public void capturarSnapshot(UserEntity user) {
         BigDecimal cuentas = cuentaService.getImporteTotal(user);
         BigDecimal inversiones = inversionService.getImporteTotal(user);
-        BigDecimal deudas = deudaService.getImporteTotal(user);
+        BigDecimal deudas = deudaService.getPendienteTotal(user);
         BigDecimal patrimonio = cuentas.add(inversiones).subtract(deudas);
 
         LocalDate mes = LocalDate.now().withDayOfMonth(1);
