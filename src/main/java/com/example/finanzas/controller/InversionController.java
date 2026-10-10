@@ -4,6 +4,7 @@ import com.example.finanzas.dto.inversion.ActualizarInversionDTO;
 import com.example.finanzas.dto.inversion.AsignarCuentaDTO;
 import com.example.finanzas.dto.inversion.CuentaInversionResponse;
 import com.example.finanzas.dto.inversion.RendimientoMesResponse;
+import com.example.finanzas.dto.inversion.RepartirInversionDTO;
 import com.example.finanzas.dto.inversion.RetiradaDTO;
 import com.example.finanzas.dto.inversion.DistribucionCategoriaResponse;
 import com.example.finanzas.dto.inversion.InversionDTO;
@@ -77,6 +78,16 @@ public class InversionController {
                                                            @RequestBody AsignarCuentaDTO dto,
                                                            @AuthenticationPrincipal UserEntity user) {
         return ResponseEntity.ok(InversionResponse.from(inversionService.asignarCuenta(id, dto.cuentaId(), user)));
+    }
+
+    /** Reparte la posición entre una o varias cuentas de inversión (sin mover efectivo). */
+    @PostMapping("/{id}/reparto")
+    public ResponseEntity<List<InversionResponse>> repartir(@PathVariable Long id,
+                                                            @Valid @RequestBody RepartirInversionDTO dto,
+                                                            @AuthenticationPrincipal UserEntity user) {
+        return ResponseEntity.ok(inversionService.repartir(id, dto, user).stream()
+                .map(InversionResponse::from)
+                .toList());
     }
 
     // ── Cuentas de inversión ────────────────────────────────────────────────
